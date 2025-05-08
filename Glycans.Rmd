@@ -1,0 +1,16 @@
+```{r Libraries}
+
+## Load the libraries ##
+library(tidyverse)
+library(readxl)
+
+```
+
+```{r Load the data}
+
+AGP <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
+C3 <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
+Serum <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
+
+```
+
