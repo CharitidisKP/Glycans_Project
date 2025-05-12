@@ -8,14 +8,34 @@ library(readxl)
 
 ```{r Load the data}
 
-AGP <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
-C3 <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
-Serum <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
-Decreased <- read_xlsx("~/SLE/Glycans/Data/decreased.xlsx")
-Increased <- read_xlsx("~/SLE/Glycans/Data/increased.xlsx")
-IgG_FAB <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
-IgG_FC <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
-IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
+# AGP <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
+# C3 <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
+# Serum <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
+Decreased_data <- read_xlsx("~/SLE/Glycans/Data/decreased.xlsx")
+Increased_data <- read_xlsx("~/SLE/Glycans/Data/increased.xlsx")
+# IgG_FAB <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
+# IgG_FC <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
+# IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
+
+```
+
+
+```{r Prep slightly}
+Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "extra-renal", "Renal Impairment")
+
+Increased <- Increased_data %>% 
+  rename(ID = `Patient number`, Time_point = `Time point`)
+
+Decreased <- Decreased_data %>% 
+  rename(ID = `Patient number`, Time_point = `Time point`)
+
+Comparator_Values <- Increased %>% 
+  select(ID, Time_point, any_of(Comparators)) %>% 
+  rename(SLEDAI2K = Comparators$`Renal Impairment`)
+
+
+
+
 
 ```
 
