@@ -8,14 +8,14 @@ library(readxl)
 
 ```{r Load the data}
 
-# AGP <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
-# C3 <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
-# Serum <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
+AGP <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
+C3 <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
+Serum <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
 Decreased_data <- read_xlsx("~/SLE/Glycans/Data/decreased.xlsx")
 Increased_data <- read_xlsx("~/SLE/Glycans/Data/increased.xlsx")
-# IgG_FAB <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
-# IgG_FC <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
-# IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
+IgG_FAB <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
+IgG_FC <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
+IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
 
 ```
 
@@ -23,19 +23,46 @@ Increased_data <- read_xlsx("~/SLE/Glycans/Data/increased.xlsx")
 ```{r Prep slightly}
 Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "extra-renal", "Renal Impairment")
 
+Comparator_Values <- Increased_data %>% 
+  rename(ID = `Patient number`, Time_point = `Time point`) %>% 
+  select(ID, Time_point, any_of(Comparators)) %>% 
+  rename(SLEDAI2K = `Renal Impairment`, 
+         SLEDAI2K_extra = `extra-renal`, 
+         S_creatinine = `S-creatinine`) %>% 
+  mutate(Identification = paste0(ID, " ", Time_point)) %>% 
+  select(-c(ID, Time_point)) %>% 
+  select(Identification, everything()) %>% 
+  column_to_rownames("Identification") %>% 
+  mutate(AI = as.numeric(AI), 
+         CI = as.numeric(CI))
+
 Increased <- Increased_data %>% 
-  rename(ID = `Patient number`, Time_point = `Time point`)
+  rename(ID = `Patient number`, Time_point = `Time point`) %>% 
+  select(-all_of(Comparators), -c(total, Clinical)) %>% 
+  mutate(Identification = paste0(ID, " ", Time_point)) %>% 
+  select(-c(ID, Time_point)) %>% 
+  select(Identification, everything()) %>% 
+  column_to_rownames("Identification")
 
 Decreased <- Decreased_data %>% 
-  rename(ID = `Patient number`, Time_point = `Time point`)
+  rename(ID = `Patient number`, Time_point = `Time point`) %>% 
+  select(-all_of(Comparators), -c(total, Clinical)) %>% 
+  mutate(Identification = paste0(ID, " ", Time_point)) %>% 
+  select(-c(ID, Time_point)) %>% 
+  select(Identification, everything()) %>% 
+  column_to_rownames("Identification")
 
-Comparator_Values <- Increased %>% 
-  select(ID, Time_point, any_of(Comparators)) %>% 
-  rename(SLEDAI2K = Comparators$`Renal Impairment`)
+```
 
+```{r Correlations}
 
+Increased_Cor <- cor(Increased, Comparator_Values, method = "spearman", use = "pairwise.complete.obs") %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "Marker")
 
-
+Decreased_Cor <- cor(Decreased, Comparator_Values, method = "spearman", use = "pairwise.complete.obs") %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "Marker")
 
 ```
 
