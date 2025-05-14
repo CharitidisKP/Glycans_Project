@@ -3,66 +3,216 @@
 ## Load the libraries ##
 library(tidyverse)
 library(readxl)
+library(purrr)
+library(broom)
+library(ggtext)
 
 ```
 
 ```{r Load the data}
 
-AGP <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
-C3 <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
-Serum <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
+AGP_Data <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
+C3_Data <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
+Serum_Data <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
 Decreased_data <- read_xlsx("~/SLE/Glycans/Data/decreased.xlsx")
 Increased_data <- read_xlsx("~/SLE/Glycans/Data/increased.xlsx")
-IgG_FAB <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
-IgG_FC <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
+IgG_FAB_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
+IgG_FC_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
 IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
+
 
 ```
 
 
 ```{r Prep slightly}
+
 Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "extra-renal", "Renal Impairment")
 
-Comparator_Values <- Increased_data %>% 
-  rename(ID = `Patient number`, Time_point = `Time point`) %>% 
-  select(ID, Time_point, any_of(Comparators)) %>% 
-  rename(SLEDAI2K = `Renal Impairment`, 
-         SLEDAI2K_extra = `extra-renal`, 
-         S_creatinine = `S-creatinine`) %>% 
-  mutate(Identification = paste0(ID, " ", Time_point)) %>% 
-  select(-c(ID, Time_point)) %>% 
-  select(Identification, everything()) %>% 
-  column_to_rownames("Identification") %>% 
-  mutate(AI = as.numeric(AI), 
+Comparator_Values <- Increased_data %>%
+  rename(ID = `Patient number`, Time_point = `Time point`) %>%
+  select(ID, Time_point, any_of(Comparators)) %>%
+  rename(SLEDAI2K = `Renal Impairment`,
+         SLEDAI2K_extra = `extra-renal`,
+         S_creatinine = `S-creatinine`) %>%
+  mutate(Identification = paste0(ID, " ", Time_point)) %>%
+  select(-c(ID, Time_point)) %>%
+  select(Identification, everything()) %>%
+  column_to_rownames("Identification") %>%
+  mutate(AI = as.numeric(AI),
          CI = as.numeric(CI))
+# 
+# Increased <- Increased_data %>% 
+#   rename(ID = `Patient number`, Time_point = `Time point`) %>% 
+#   select(-all_of(Comparators), -c(total, Clinical)) %>% 
+#   mutate(Identification = paste0(ID, " ", Time_point)) %>% 
+#   select(-c(ID, Time_point)) %>% 
+#   select(Identification, everything()) %>% 
+#   column_to_rownames("Identification")
+# 
+# Decreased <- Decreased_data %>% 
+#   rename(ID = `Patient number`, Time_point = `Time point`) %>% 
+#   select(-all_of(Comparators), -c(total, Clinical)) %>% 
+#   mutate(Identification = paste0(ID, " ", Time_point)) %>% 
+#   select(-c(ID, Time_point)) %>% 
+#   select(Identification, everything()) %>% 
+#   column_to_rownames("Identification")
+# 
+# Sign <- colnames(Increased)
 
-Increased <- Increased_data %>% 
-  rename(ID = `Patient number`, Time_point = `Time point`) %>% 
-  select(-all_of(Comparators), -c(total, Clinical)) %>% 
-  mutate(Identification = paste0(ID, " ", Time_point)) %>% 
-  select(-c(ID, Time_point)) %>% 
-  select(Identification, everything()) %>% 
-  column_to_rownames("Identification")
+```
 
-Decreased <- Decreased_data %>% 
-  rename(ID = `Patient number`, Time_point = `Time point`) %>% 
-  select(-all_of(Comparators), -c(total, Clinical)) %>% 
-  mutate(Identification = paste0(ID, " ", Time_point)) %>% 
-  select(-c(ID, Time_point)) %>% 
-  select(Identification, everything()) %>% 
-  column_to_rownames("Identification")
+```{r Make the marker names pretty}
+
+# AGP_Sign <- AGP %>% 
+#   select(any_of(Sign)) %>% 
+#   colnames()
+# 
+# C3_Sign <- C3 %>% 
+#   select(any_of(Sign)) %>% 
+#   colnames() 
+# 
+# Serum_Sign <- Serum %>% 
+#   select(any_of(Sign)) %>% 
+#   colnames()
+# 
+# IgG_FAB_Sign <- c("F", "G2", "GP1", "GP11", "GP13", "GP2", "GP25", "GP27", "GP9")
+# 
+# IgG_Fc_Sign <- c("F", "G2", "GP1", "GP11", "GP13", "GP2", "GP25", "GP27", "GP9")
 
 ```
 
 ```{r Correlations}
 
-Increased_Cor <- cor(Increased, Comparator_Values, method = "spearman", use = "pairwise.complete.obs") %>% 
-  as.data.frame() %>% 
-  rownames_to_column(var = "Marker")
+# Increased_Cor <- cor(Increased, Comparator_Values, method = "spearman", use = "pairwise.complete.obs") %>% 
+#   as.data.frame() %>% 
+#   rownames_to_column(var = "Marker")
+# 
+# Decreased_Cor <- cor(Decreased, Comparator_Values, method = "spearman", use = "pairwise.complete.obs") %>% 
+#   as.data.frame() %>% 
+#   rownames_to_column(var = "Marker")
 
-Decreased_Cor <- cor(Decreased, Comparator_Values, method = "spearman", use = "pairwise.complete.obs") %>% 
-  as.data.frame() %>% 
-  rownames_to_column(var = "Marker")
+```
 
+```{r}
+
+Dataframes <- list(AGP = AGP_Data, 
+                   C3 = C3_Data, 
+                   Serum = Serum_Data,
+                   Fab = IgG_FAB_Data, 
+                   Fc = IgG_FC_Data)
+
+Process_DFs <- function(df){
+  df %>% 
+    select(-c(Sample, `ID_St Luc`)) %>% 
+    rename(ID = `Patient number`, Time_point = `Time point`) %>% 
+    mutate(across(.cols = -c(ID, Time_point), .fns  = as.numeric)) %>% 
+    pivot_longer(cols = -c(ID, Time_point), names_to   = "Marker", values_to  = "Value")
+}
+
+Long_Dataframes <- map(Dataframes, Process_DFs)
+
+```
+
+```{r Get the direction of each marker}
+
+Directions_List <- imap(Long_Dataframes, ~ {
+  df <- .x
+  prefix <- .y
+  
+  df %>% 
+    mutate(Marker_Timepoint = paste0(Marker, Time_point)) %>%
+    group_by(Marker_Timepoint) %>%
+    summarise(Mean = mean(Value, na.rm = TRUE), .groups = "drop") %>%
+    extract(col = Marker_Timepoint, 
+          into = c("Marker", "Timepoint"), 
+          regex = "(.+)(T0|T12)$") %>% 
+    pivot_wider(names_from = "Timepoint", values_from = "Mean") %>% 
+    mutate(Direction = case_when(T12 > T0 ~ "Increase", 
+                                 T12 < T0 ~ "Decrease", 
+                                 TRUE ~ NA), 
+           Marker = paste0(prefix, "_", Marker),
+           Origin = prefix) %>% 
+    select(Marker, Direction, Origin)
+})
+
+Directions <- bind_rows(Directions_List)
+
+```
+
+```{r Perform the tests}
+
+Paired_Tests <- function(df){ df %>% 
+  pivot_wider(names_from = "Time_point", values_from = "Value", names_prefix = "Value_") %>% 
+  group_by(Marker) %>% 
+  summarise(Pairs = n_distinct(ID),
+            Test = list(wilcox.test(Value_T12, 
+                                    Value_T0, 
+                                    paired = TRUE, 
+                                    exact = FALSE)), 
+                        .groups = "drop") %>% 
+  mutate(Results = map(Test, broom::tidy)) %>% 
+  unnest(Results) %>% 
+  select(Marker, Pairs, statistic, p.value, method)
+}
+
+Test_Results <- imap(Long_Dataframes, ~Paired_Tests(.x) %>% 
+                       mutate(Marker = paste0(.y, "_", Marker)))
+
+Test_Results <- bind_rows(Test_Results, .id = "Origin")
+
+```
+
+```{r Combine the direction with the tests}
+
+Results_Total <- Test_Results %>% inner_join(Directions, by = c("Origin", "Marker"))
+
+Dataframes_Final <- imap(
+  Long_Dataframes, ~ .x %>% 
+      mutate(Marker = paste0(.y, "_", Marker), 
+             Origin = .y)) %>% 
+  bind_rows(., .id = "Origin") %>% 
+  select(ID, Origin, everything())
+
+Results_Sign <- Results_Total %>% 
+  filter(p.value < 0.05)
+
+Dataframes_Final_Sign <- Dataframes_Final %>% 
+  filter(Marker %in% Results_Sign$Marker)
+
+```
+
+```{r Correlation analysis}
+
+Dataframes_Final_Sign_Wide <- Dataframes_Final_Sign %>% 
+  mutate(ID = paste0(ID, " ", Time_point)) %>% 
+  select(-c(Time_point, Origin)) %>% 
+  pivot_wider(id_cols = ID, names_from = "Marker", values_from = "Value") %>% 
+  column_to_rownames(var = "ID")
+
+Correlations <- cor(Dataframes_Final_Sign_Wide, 
+                    Comparator_Values, 
+                    method = "spearman", 
+                    use = "pairwise.complete.obs") %>% 
+  as.data.frame() %>%
+  rownames_to_column(var = "Marker") %>% 
+  pivot_longer(cols = -Marker, 
+               names_to = "Variable", 
+               values_to = "Correlation")
+
+```
+
+```{r Correlations visualisation}
+
+ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlation)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                       midpoint = 0, name = "Spearman<br>Correlation", breaks = seq(-1, 1, by = 0.5)) +
+  geom_text(aes(label = round(Correlation, 2)), size = 3) +
+  labs(title = "Heatmap of Marker Correlations", x = NULL, y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 8),
+        panel.grid  = element_blank(), 
+        legend.title = element_markdown(face = "bold"))
 ```
 
