@@ -40,60 +40,10 @@ Comparator_Values <- Increased_data %>%
   column_to_rownames("Identification") %>%
   mutate(AI = as.numeric(AI),
          CI = as.numeric(CI))
-# 
-# Increased <- Increased_data %>% 
-#   rename(ID = `Patient number`, Time_point = `Time point`) %>% 
-#   select(-all_of(Comparators), -c(total, Clinical)) %>% 
-#   mutate(Identification = paste0(ID, " ", Time_point)) %>% 
-#   select(-c(ID, Time_point)) %>% 
-#   select(Identification, everything()) %>% 
-#   column_to_rownames("Identification")
-# 
-# Decreased <- Decreased_data %>% 
-#   rename(ID = `Patient number`, Time_point = `Time point`) %>% 
-#   select(-all_of(Comparators), -c(total, Clinical)) %>% 
-#   mutate(Identification = paste0(ID, " ", Time_point)) %>% 
-#   select(-c(ID, Time_point)) %>% 
-#   select(Identification, everything()) %>% 
-#   column_to_rownames("Identification")
-# 
-# Sign <- colnames(Increased)
 
 ```
 
-```{r Make the marker names pretty}
-
-# AGP_Sign <- AGP %>% 
-#   select(any_of(Sign)) %>% 
-#   colnames()
-# 
-# C3_Sign <- C3 %>% 
-#   select(any_of(Sign)) %>% 
-#   colnames() 
-# 
-# Serum_Sign <- Serum %>% 
-#   select(any_of(Sign)) %>% 
-#   colnames()
-# 
-# IgG_FAB_Sign <- c("F", "G2", "GP1", "GP11", "GP13", "GP2", "GP25", "GP27", "GP9")
-# 
-# IgG_Fc_Sign <- c("F", "G2", "GP1", "GP11", "GP13", "GP2", "GP25", "GP27", "GP9")
-
-```
-
-```{r Correlations}
-
-# Increased_Cor <- cor(Increased, Comparator_Values, method = "spearman", use = "pairwise.complete.obs") %>% 
-#   as.data.frame() %>% 
-#   rownames_to_column(var = "Marker")
-# 
-# Decreased_Cor <- cor(Decreased, Comparator_Values, method = "spearman", use = "pairwise.complete.obs") %>% 
-#   as.data.frame() %>% 
-#   rownames_to_column(var = "Marker")
-
-```
-
-```{r}
+```{r Make dtaaframes long}
 
 Dataframes <- list(AGP = AGP_Data, 
                    C3 = C3_Data, 
@@ -197,22 +147,37 @@ Correlations <- cor(Dataframes_Final_Sign_Wide,
   rownames_to_column(var = "Marker") %>% 
   pivot_longer(cols = -Marker, 
                names_to = "Variable", 
-               values_to = "Correlation")
+               values_to = "Correlation") %>% 
+  mutate(Origin = sub("_.*$", "", Marker))
 
 ```
 
 ```{r Correlations visualisation}
 
-ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlation)) +
-  geom_tile(color = "white") +
+Main_plot <- ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlation)) +
+  geom_tile(color = "white", width = 1, height = 1) +
   scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
                        midpoint = 0, name = "Spearman<br>Correlation", breaks = seq(-1, 1, by = 0.5)) +
+  facet_grid(Origin ~., scales = "free_y", space = "free_y", switch = "x") +
   geom_text(aes(label = round(Correlation, 2)), size = 3) +
-  labs(title = "Heatmap of Marker Correlations", x = NULL, y = NULL) +
+  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x)) +
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("_", " ", x)
+    x <- gsub("SLEDAI2K extra", "SLEDAI2K<br>extra", x)
+    x }) +
+  labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
   theme_minimal(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1), 
-        axis.text.y = element_text(size = 8),
-        panel.grid  = element_blank(), 
-        legend.title = element_markdown(face = "bold"))
+  theme(strip.placement = "outside",
+        strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold"),
+    axis.text.x = element_markdown(angle = 45, hjust = 1, face = "bold"), 
+    axis.text.y = element_text(size = 8, face = "bold"),
+    panel.grid  = element_blank(), 
+    legend.title = element_markdown(face = "bold"), 
+    panel.spacing = unit(0.5, "lines"), 
+    plot.title = element_text(face = "bold"))
+
+ggsave(Main_plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations.jpeg",
+       width = 10, height = 14, dpi = 300)
+
 ```
 
