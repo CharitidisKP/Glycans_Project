@@ -6,6 +6,7 @@ library(readxl)
 library(purrr)
 library(broom)
 library(ggtext)
+library(patchwork)
 
 ```
 
@@ -148,7 +149,8 @@ Correlations <- cor(Dataframes_Final_Sign_Wide,
   pivot_longer(cols = -Marker, 
                names_to = "Variable", 
                values_to = "Correlation") %>% 
-  mutate(Origin = sub("_.*$", "", Marker))
+  mutate(Origin = sub("_.*$", "", Marker)) %>% 
+  inner_join(Directions, by = c("Marker", "Origin"))
 
 ```
 
@@ -178,6 +180,43 @@ Main_plot <- ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlati
 
 ggsave(Main_plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations.jpeg",
        width = 10, height = 14, dpi = 300)
+
+```
+
+```{r}
+dir_plot <- Correlations %>%
+  distinct(Origin, Marker, Direction) %>% 
+  ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  facet_grid(
+    Origin ~ .,
+    scales = "free_y",
+    space  = "free_y",
+    switch = "y"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Increase"   = "mediumspringgreen",
+      "Decrease"   = "purple",
+      "No change"  = "grey80"
+    ),
+    name = "T12 vs T0"
+  ) +
+  scale_y_discrete(expand = c(0,0)) +
+  scale_x_continuous(expand = c(0,0)) +
+  theme_void() +
+  theme(
+    strip.text.y = element_blank(),
+    strip.text.y.right  = element_text(angle = 0, hjust = 0),
+    legend.position     = "bottom",
+    legend.title        = element_text(face = "bold"),
+    plot.margin         = margin(0,0,0,0)
+  )
+
+combined <- dir_plot + Main_plot + 
+  plot_layout(widths = c(0.1, 1)) +    # adjust 0.15 to taste
+  plot_annotation(theme = theme(plot.margin = margin(5,5,5,5)))
+
 
 ```
 
