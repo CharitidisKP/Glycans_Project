@@ -197,7 +197,7 @@ Main_plot <- ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlati
         panel.spacing = unit(1, "lines"), 
         plot.title = element_text(face = "bold"))
 
-dir_plot <- Correlations %>%
+Dir_plot <- Correlations %>%
   distinct(Origin, Marker, Direction) %>% 
   ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
   geom_tile(color = "white", width = 1, height = 1) +
@@ -217,7 +217,7 @@ dir_plot <- Correlations %>%
         panel.spacing.x = unit(0, "lines"),
         panel.spacing = unit(1, "lines"))
 
-combined <- Main_plot + dir_plot +
+Combined_Plot <- Main_plot + Dir_plot +
   plot_layout(widths = c(0.95, 0.05), 
               # widths = c(length(unique(Correlations$Variable)), 1), 
               guides = "collect") +   
@@ -226,13 +226,108 @@ combined <- Main_plot + dir_plot +
         legend.position = "right",
         legend.title.position = "bottom")
 
-ggsave(combined, filename = "~/SLE/Glycans/Plots/Glycans_Correlations.jpeg", width = 10, height = 16, dpi = 300)
+ggsave(Combined_Plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations.jpeg", width = 10, height = 16, dpi = 300)
 
 ```
 
 
-```{r}
+```{r Delta calculation and correlation}
+
+Dataframes_Delta <- Dataframes_Final %>% 
+  group_by(ID, Marker) %>% 
+  mutate(Delta = order_by(Time_point, Value - lag(Value))) %>%
+  mutate(Delta = ifelse(is.na(Delta), 0, Delta)) %>% 
+  filter(Time_point == "T12") %>% 
+  select(-c(Time_point, Value, Origin)) %>% 
+  pivot_wider(id_cols = ID, names_from = Marker, values_from = Delta) %>% 
+  column_to_rownames(var = "ID")
+
+Comparator_Values_Delta <- Increased_data %>%
+  rename(ID = `Patient number`, Time_point = `Time point`) %>%
+  select(ID, Time_point, any_of(Comparators)) %>%
+  rename(SLEDAI2K = `Renal Impairment`,
+         SLEDAI2K_extra = `extra-renal`,
+         S_creatinine = `S-creatinine`) %>%
+  filter(Time_point == "T12") %>% 
+  select(-Time_point) %>%
+  select(ID, everything()) %>%
+  column_to_rownames("ID") %>%
+  mutate(AI = as.numeric(AI),
+         CI = as.numeric(CI))
+
+DFs_Delta_Combined <- cbind(Dataframes_Delta, Comparator_Values_Delta)
+
+Correlations_Delta <- expand_grid(Marker = colnames(Dataframes_Delta), 
+              Variable = colnames(Comparator_Values_Delta)) %>% 
+  mutate(test = map2(Marker, Variable, ~ cor.test(DFs_Delta_Combined[[.x]], DFs_Delta_Combined[[.y]], 
+                                                  method = "spearman", exact  = FALSE)),
+         rho     = map_dbl(test, "estimate"), 
+         p.value = map_dbl(test, "p.value", )) %>%
+  mutate(P_adjust = p.adjust(p.value, method = "BH")) %>% 
+  select(-test) %>% 
+  mutate(Origin = sub("_.*$", "", Marker)) %>% 
+  inner_join(Directions, by = c("Marker", "Origin")) %>% 
+  rename(Correlation = "rho") %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*"))
+
 
 ```
 
+```{r Correlations visualisation for the Deltas}
 
+Main_plot_Delta <- ggplot(Correlations_Delta, aes(x = Variable, y = Marker, fill = Correlation)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+  facet_grid(Origin ~., scales = "free_y", space = "free_y", switch = "x") +
+  # geom_text(aes(label = round(Correlation, 2)), size = 3) +
+  geom_text(aes(label = Significance, vjust = 0.8, hjust = 0.5, fontface = "bold")) +
+  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("_", " ", x)
+    x <- gsub("SLEDAI2K extra", "SLEDAI2K<br>extra", x)
+    x }, expand = c(0,0)) +
+  labs(title = "Heatmap of Glycan Deltas Correlations", x = NULL, y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(strip.placement = "outside",
+        strip.text.y.right = element_blank(),
+        axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
+        axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+        panel.grid  = element_blank(), 
+        panel.spacing = unit(1, "lines"), 
+        plot.title = element_text(face = "bold"))
+
+Dir_plot_Delta <- Correlations_Delta %>%
+  distinct(Origin, Marker, Direction) %>% 
+  ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  facet_grid(Origin ~ ., scales = "free_y", space  = "free_y", switch = "x") +
+  scale_fill_manual(values = c("Increase" = "mediumspringgreen",
+                               "Decrease" = "purple", 
+                               "No change"  = "grey80"), 
+                    guide = guide_legend(order = 2, title.position = "top", 
+                                         title = "T12 vs T0", title.theme = element_markdown(face = "bold", size = 12), 
+                                         title.hjust = 0, label.position = "right", 
+                                         keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
+  scale_y_discrete(expand = c(0,0)) +
+  scale_x_continuous(expand = c(0,0)) +
+  theme_void() +
+  theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        plot.margin = margin(0, 0, 0, 0), 
+        panel.spacing.x = unit(0, "lines"),
+        panel.spacing = unit(1, "lines"))
+
+Combined_Delta <- Main_plot_Delta + Dir_plot_Delta +
+  plot_layout(widths = c(0.95, 0.05), 
+              # widths = c(length(unique(Correlations$Variable)), 1), 
+              guides = "collect") +   
+  plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
+  theme(legend.box = "vertical", 
+        legend.position = "right",
+        legend.title.position = "bottom")
+
+ggsave(Combined_Delta, filename = "~/SLE/Glycans/Plots/Glycans_Correlations_Delta.jpeg", width = 10, height = 24, dpi = 300)
+
+```
