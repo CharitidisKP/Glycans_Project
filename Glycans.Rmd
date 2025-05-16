@@ -226,7 +226,7 @@ Combined_Plot <- Main_plot + Dir_plot +
         legend.position = "right",
         legend.title.position = "bottom")
 
-ggsave(Combined_Plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations.jpeg", width = 10, height = 16, dpi = 300)
+# ggsave(Combined_Plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations.jpeg", width = 10, height = 16, dpi = 300)
 
 ```
 
@@ -248,14 +248,18 @@ Comparator_Values_Delta <- Increased_data %>%
   rename(SLEDAI2K = `Renal Impairment`,
          SLEDAI2K_extra = `extra-renal`,
          S_creatinine = `S-creatinine`) %>%
-  filter(Time_point == "T12") %>% 
-  select(-Time_point) %>%
-  select(ID, everything()) %>%
-  column_to_rownames("ID") %>%
   mutate(AI = as.numeric(AI),
-         CI = as.numeric(CI))
+         CI = as.numeric(CI)) %>% 
+  pivot_longer(cols = -c(ID, Time_point), names_to = "Marker", values_to = "Value") %>% 
+  group_by(ID, Marker) %>% 
+  mutate(Delta = order_by(Time_point, Value - lag(Value))) %>%
+  mutate(Delta = ifelse(is.na(Delta), 0, Delta)) %>% 
+  filter(Time_point == "T12") %>% 
+  select(ID, Marker, Delta) %>% 
+  pivot_wider(id_cols = "ID", names_from = "Marker", values_from = "Delta") %>% 
+  column_to_rownames(var = "ID")
 
-DFs_Delta_Combined <- cbind(Dataframes_Delta, Comparator_Values_Delta)
+DFs_Delta_Combined <- cbind(Dataframes_Delta, Comparator_Values_Delta) 
 
 Correlations_Delta <- expand_grid(Marker = colnames(Dataframes_Delta), 
               Variable = colnames(Comparator_Values_Delta)) %>% 
