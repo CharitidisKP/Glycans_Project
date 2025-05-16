@@ -140,17 +140,34 @@ Dataframes_Final_Sign_Wide <- Dataframes_Final_Sign %>%
   pivot_wider(id_cols = ID, names_from = "Marker", values_from = "Value") %>% 
   column_to_rownames(var = "ID")
 
-Correlations <- cor(Dataframes_Final_Sign_Wide, 
-                    Comparator_Values, 
-                    method = "spearman", 
-                    use = "pairwise.complete.obs") %>% 
-  as.data.frame() %>%
-  rownames_to_column(var = "Marker") %>% 
-  pivot_longer(cols = -Marker, 
-               names_to = "Variable", 
-               values_to = "Correlation") %>% 
+# Correlations <- cor(Dataframes_Final_Sign_Wide, 
+#                     Comparator_Values, 
+#                     method = "spearman", 
+#                     use = "pairwise.complete.obs") %>% 
+#   as.data.frame() %>%
+#   rownames_to_column(var = "Marker") %>% 
+#   pivot_longer(cols = -Marker, 
+#                names_to = "Variable", 
+#                values_to = "Correlation") %>% 
+#   mutate(Origin = sub("_.*$", "", Marker)) %>% 
+#   inner_join(Directions, by = c("Marker", "Origin"))
+
+
+DFs_Combined <- cbind(Dataframes_Final_Sign_Wide, Comparator_Values)
+
+Correlations <- expand_grid(Marker = colnames(Dataframes_Final_Sign_Wide), 
+              Variable = colnames(Comparator_Values)) %>% 
+  mutate(test = map2(Marker, Variable, ~ cor.test(DFs_Combined[[.x]], DFs_Combined[[.y]], 
+                                                  method = "spearman", exact  = FALSE)),
+         rho     = map_dbl(test, "estimate"), 
+         p.value = map_dbl(test, "p.value", )) %>%
+  mutate(P_adjust = p.adjust(p.value, method = "BH")) %>% 
+  select(-test) %>% 
   mutate(Origin = sub("_.*$", "", Marker)) %>% 
-  inner_join(Directions, by = c("Marker", "Origin"))
+  inner_join(Directions, by = c("Marker", "Origin")) %>% 
+  rename(Correlation = "rho") %>% 
+  mutate(Significance = case_when(P_adjust < 0.05 ~ "*"))
+
 
 ```
 
@@ -159,9 +176,12 @@ Correlations <- cor(Dataframes_Final_Sign_Wide,
 Main_plot <- ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
   scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
-                       midpoint = 0, name = "Spearman<br>Correlation", breaks = seq(-1, 1, by = 0.5)) +
+                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0.5, 
+                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
   facet_grid(Origin ~., scales = "free_y", space = "free_y", switch = "x") +
-  geom_text(aes(label = round(Correlation, 2)), size = 3) +
+  # geom_text(aes(label = round(Correlation, 2)), size = 3) +
+  geom_text(aes(label = Significance)) +
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
@@ -171,10 +191,9 @@ Main_plot <- ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlati
   theme_minimal(base_size = 12) +
   theme(strip.placement = "outside",
         strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold"),
-    axis.text.x = element_markdown(angle = 45, hjust = 1, face = "bold"), 
+    axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold"), 
     axis.text.y = element_text(size = 8, face = "bold"),
     panel.grid  = element_blank(), 
-    legend.title = element_markdown(face = "bold"), 
     panel.spacing = unit(0.5, "lines"), 
     plot.title = element_text(face = "bold"))
 
@@ -184,39 +203,36 @@ ggsave(Main_plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations.jpeg",
 ```
 
 ```{r}
+
 dir_plot <- Correlations %>%
   distinct(Origin, Marker, Direction) %>% 
   ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
   geom_tile(color = "white", width = 1, height = 1) +
-  facet_grid(
-    Origin ~ .,
-    scales = "free_y",
-    space  = "free_y",
-    switch = "y"
-  ) +
-  scale_fill_manual(
-    values = c(
-      "Increase"   = "mediumspringgreen",
-      "Decrease"   = "purple",
-      "No change"  = "grey80"
-    ),
-    name = "T12 vs T0"
-  ) +
+  facet_grid(Origin ~ ., scales = "free_y", space  = "free_y", switch = "y") +
+  scale_fill_manual(values = c("Increase" = "mediumspringgreen",
+                               "Decrease" = "purple", 
+                               "No change"  = "grey80"), 
+                    name = "T12 vs T0", 
+                    guide = guide_legend(order = 2, title.position = "top", 
+                                         title.hjust = 0.5, label.position = "right")) +
   scale_y_discrete(expand = c(0,0)) +
   scale_x_continuous(expand = c(0,0)) +
   theme_void() +
-  theme(
-    strip.text.y = element_blank(),
-    strip.text.y.right  = element_text(angle = 0, hjust = 0),
-    legend.position     = "bottom",
-    legend.title        = element_text(face = "bold"),
-    plot.margin         = margin(0,0,0,0)
-  )
+  theme(strip.text.y = element_blank(),
+        strip.text.y.right = element_text(angle = 0, hjust = 0),
+        legend.position = "bottom",
+        legend.title = element_text(face = "bold"),
+        plot.margin = margin(0,0,0,0))
 
 combined <- dir_plot + Main_plot + 
-  plot_layout(widths = c(0.1, 1)) +    # adjust 0.15 to taste
-  plot_annotation(theme = theme(plot.margin = margin(5,5,5,5)))
+  plot_layout(widths = c(0.1, 1), guides = "collect") +    # adjust 0.15 to taste
+  plot_annotation(theme = theme(plot.margin = margin(5,5,5,5))) +
+  theme(legend.box = "vertical", legend.title.align = 0.5)
 
+
+```
+
+```{r}
 
 ```
 
