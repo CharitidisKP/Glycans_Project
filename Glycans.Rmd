@@ -332,6 +332,115 @@ Combined_Delta <- Main_plot_Delta + Dir_plot_Delta +
         legend.position = "right",
         legend.title.position = "bottom")
 
-ggsave(Combined_Delta, filename = "~/SLE/Glycans/Plots/Glycans_Correlations_Delta.jpeg", width = 10, height = 24, dpi = 300)
+# ggsave(Combined_Delta, filename = "~/SLE/Glycans/Plots/Glycans_Correlations_Delta.jpeg", width = 10, height = 24, dpi = 300)
 
 ```
+
+
+
+
+```{r}
+
+DFs_for_GLMs <- DFs_Combined %>% 
+  rownames_to_column(var = "Patients") %>% 
+  extract(Patients, into = c("ID", "Timepoint"), 
+          regex = "Patient\\s+(\\d+)\\s+(T\\d+)", remove = TRUE) %>% 
+  mutate(ID = as.integer(ID), 
+         Timepoint = factor(Timepoint, levels = c("T0", "T12"))) %>% 
+  drop_na()
+
+sapply(DFs_for_GLMs, function(x) sum(is.na(x)))
+
+SLEDAI2K_model <- glm(SLEDAI2K ~ ., data = DFs_for_GLMs %>% select(-c(ID, Timepoint)), family = binomial)
+summary(SLEDAI2K_model)
+
+broom::tidy(SLEDAI2K_model) %>%
+  mutate(OR = exp(estimate),
+         lower = exp(estimate - 1.96 * std.error),
+         upper = exp(estimate + 1.96 * std.error))
+  
+```
+
+```{r}
+
+table(DFs_for_GLMs$SLEDAI2K)
+
+library(caret)
+nzv <- nearZeroVar(DFs_for_GLMs %>% select(-ID, -Timepoint, -SLEDAI2K),
+                   saveMetrics=TRUE)
+nzv[nzv$zeroVar | nzv$nzv, ]
+
+```
+
+```{r}
+
+Comparators_clean <- colnames(Comparator_Values)
+
+Top_Markers <- Correlations %>% 
+  filter(Variable == "SLEDAI2K") %>% 
+  arrange(desc(abs(Correlation))) %>% 
+  slice_head(n = 3) %>% 
+  pull(Marker)
+  
+Top_Markers_Origin <- Correlations %>% 
+  filter(Variable == "SLEDAI2K") %>% 
+  group_by(Origin) %>% 
+  arrange(desc(abs(Correlation))) %>% 
+  slice_head(n = 5) %>% 
+  summarise(Markers = list(Marker)) %>% 
+  ungroup() %>% 
+  deframe()
+
+SLEDAI2K_model_sub <- glm(paste("SLEDAI2K ~ ", paste(Top_Markers, collapse = " + ")), 
+                          data = DFs_for_GLMs %>% select(-c(ID, Timepoint)), family = binomial)
+
+summary(SLEDAI2K_model_sub)
+
+broom::tidy(SLEDAI2K_model_sub) %>%
+  mutate(OR = exp(estimate),
+         lower = exp(estimate - 1.96 * std.error),
+         upper = exp(estimate + 1.96 * std.error))
+
+
+
+
+
+
+
+```
+
+```{r}
+
+## Get the names of the Markers for the comparisons ##
+Candidates <- setdiff(names(DFs_for_GLMs), c("ID", "Timepoint", "SLEDAI2K"))
+
+## GLMs for each of the Markers compared to SLEDAI2K ##
+univ_results <- map_df(Candidates, function(var){
+  
+  ## Build the SLEDAI2K ~ variable formulas ##
+  fmla <- reformulate(var, response = "SLEDAI2K")
+  
+  ## Fit the model ##
+  m <- glm(fmla, data = DFs_for_GLMs, family = binomial)
+  
+  ## Extract the predictor row, add OR and CIs
+  broom::tidy(m)[2, ] %>%
+    transmute(Marker = var, estimate, std.error, statistic, p.value, 
+              OR = exp(estimate), 
+              lower = exp(estimate - 1.96 * std.error),
+              upper = exp(estimate + 1.96 * std.error))
+})
+
+## Adjust p values (Might not be necessary) ##
+# univ_results <- univ_results %>%
+#   mutate(p.adj = p.adjust(p.value, method = "BH"))
+
+## Get the significant glms ##
+Univ_sign_p <- univ_results %>% filter(p.value < 0.05)
+Univ_sign_OR <- univ_results %>% arrange(desc(abs(log(OR))))
+
+
+```
+
+
+
