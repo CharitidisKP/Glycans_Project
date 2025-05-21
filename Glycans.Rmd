@@ -22,18 +22,19 @@ IgG_FC_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
 IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
 
 
+
 ```
 
 
 ```{r Prep slightly}
 
-Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "extra-renal", "Renal Impairment")
+Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "extra-renal", "Renal Impairment", "Clinical")
 
 Comparator_Values <- Increased_data %>%
   rename(ID = `Patient number`, Time_point = `Time point`) %>%
   select(ID, Time_point, any_of(Comparators)) %>%
-  rename(SLEDAI2K = `Renal Impairment`,
-         SLEDAI2K_extra = `extra-renal`,
+  rename(Renal_Impairment = `Renal Impairment`,
+         Extra_Renal = `extra-renal`,
          S_creatinine = `S-creatinine`) %>%
   mutate(Identification = paste0(ID, " ", Time_point)) %>%
   select(-c(ID, Time_point)) %>%
@@ -41,6 +42,8 @@ Comparator_Values <- Increased_data %>%
   column_to_rownames("Identification") %>%
   mutate(AI = as.numeric(AI),
          CI = as.numeric(CI))
+
+Comparators <- c("AI", "CI", "S_creatinine", "eGFR", "UPCR", "albumin", "Extra_Renal", "Renal_Impairment", "Clinical")
 
 ```
 
@@ -185,7 +188,8 @@ Main_plot <- ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlati
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
-    x <- gsub("SLEDAI2K extra", "SLEDAI2K<br>extra", x)
+    x <- gsub("Renal_Extra", "Renal<br>Extra", x)
+    x <- gsub("Renal_Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
   labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
   theme_minimal(base_size = 12) +
@@ -226,7 +230,7 @@ Combined_Plot <- Main_plot + Dir_plot +
         legend.position = "right",
         legend.title.position = "bottom")
 
-# ggsave(Combined_Plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations.jpeg", width = 10, height = 16, dpi = 300)
+# ggsave(Combined_Plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations_2.jpeg", width = 10, height = 16, dpi = 300)
 
 ```
 
