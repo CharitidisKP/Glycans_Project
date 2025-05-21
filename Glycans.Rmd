@@ -6,7 +6,7 @@ output:
     df_print: kable
 ---
 
-```{r Libraries}
+```{r Libraries, }
 
 ## Load the libraries ##
 library(tidyverse)
@@ -16,6 +16,9 @@ library(broom)
 library(ggtext)
 library(patchwork)
 library(caret)
+library(jtools)
+library(ggplot2)
+
 
 ```
 
@@ -249,7 +252,9 @@ Dataframes_Delta <- Dataframes_Final %>%
   mutate(Delta = ifelse(is.na(Delta), 0, Delta)) %>% 
   filter(Time_point == "T12") %>% 
   select(-c(Time_point, Value, Origin)) %>% 
-  pivot_wider(id_cols = ID, names_from = Marker, values_from = Delta) %>% 
+  pivot_wider(id_cols = ID, 
+              names_from = Marker, 
+              values_from = Delta) %>% 
   column_to_rownames(var = "ID")
 
 Comparator_Values_Delta <- Increased_data %>%
@@ -260,22 +265,29 @@ Comparator_Values_Delta <- Increased_data %>%
          S_creatinine = `S-creatinine`) %>%
   mutate(AI = as.numeric(AI),
          CI = as.numeric(CI)) %>% 
-  pivot_longer(cols = -c(ID, Time_point), names_to = "Marker", values_to = "Value") %>% 
+  pivot_longer(cols = -c(ID, Time_point), 
+               names_to = "Marker", 
+               values_to = "Value") %>% 
   group_by(ID, Marker) %>% 
   mutate(Delta = order_by(Time_point, Value - lag(Value))) %>%
   mutate(Delta = ifelse(is.na(Delta), 0, Delta)) %>% 
   filter(Time_point == "T12") %>% 
   select(ID, Marker, Delta) %>% 
-  pivot_wider(id_cols = "ID", names_from = "Marker", values_from = "Delta") %>% 
+  pivot_wider(id_cols = "ID", 
+              names_from = "Marker", 
+              values_from = "Delta") %>% 
   column_to_rownames(var = "ID")
 
 DFs_Delta_Combined <- cbind(Dataframes_Delta, Comparator_Values_Delta) 
 
 Correlations_Delta <- expand_grid(Marker = colnames(Dataframes_Delta), 
               Variable = colnames(Comparator_Values_Delta)) %>% 
-  mutate(test = map2(Marker, Variable, ~ cor.test(DFs_Delta_Combined[[.x]], DFs_Delta_Combined[[.y]], 
-                                                  method = "spearman", exact  = FALSE)),
-         rho     = map_dbl(test, "estimate"), 
+  mutate(test = map2(Marker, 
+                     Variable, ~ cor.test(DFs_Delta_Combined[[.x]], 
+                                          DFs_Delta_Combined[[.y]], 
+                                          method = "spearman", 
+                                          exact  = FALSE)),
+         rho = map_dbl(test, "estimate"), 
          p.value = map_dbl(test, "p.value", )) %>%
   mutate(P_adjust = p.adjust(p.value, method = "BH")) %>% 
   select(-test) %>% 
@@ -291,25 +303,42 @@ Correlations_Delta <- expand_grid(Marker = colnames(Dataframes_Delta),
 
 Main_plot_Delta <- ggplot(Correlations_Delta, aes(x = Variable, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
-  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
-                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
-                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
-                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
-  facet_grid(Origin ~., scales = "free_y", space = "free_y", switch = "x") +
+  scale_fill_gradient2(low = "dodgerblue", 
+                       mid = "white", 
+                       high = "firebrick", 
+                       midpoint = 0, 
+                       breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, 
+                                              title.position = "top", 
+                                              title.hjust = 0, 
+                                              title = "Spearman<br>Correlation", 
+                                              title.theme = element_markdown(face = "bold"))) +
+  facet_grid(Origin ~., 
+             scales = "free_y", 
+             space = "free_y", 
+             switch = "x") +
   # geom_text(aes(label = round(Correlation, 2)), size = 3) +
   geom_text(aes(label = Significance, vjust = 0.8, hjust = 0.5, fontface = "bold")) +
-  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), 
+                   expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
     x <- gsub("Extra Renal", "Extra<br>Renal", x)
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
-  labs(title = "Heatmap of Glycan Deltas Correlations", x = NULL, y = NULL) +
+  labs(title = "Heatmap of Glycan Deltas Correlations", 
+       x = NULL, 
+       y = NULL) +
   theme_minimal(base_size = 12) +
   theme(strip.placement = "outside",
         strip.text.y.right = element_blank(),
-        axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
-        axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+        axis.text.x = element_markdown(angle = 0, 
+                                       hjust = 0.5, 
+                                       face = "bold", 
+                                       colour = "black"), 
+        axis.text.y = element_text(size = 8, 
+                                   face = "bold", 
+                                   colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
         plot.title = element_text(face = "bold"))
@@ -317,19 +346,32 @@ Main_plot_Delta <- ggplot(Correlations_Delta, aes(x = Variable, y = Marker, fill
 Dir_plot_Delta <- Correlations_Delta %>%
   distinct(Origin, Marker, Direction) %>% 
   ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
-  geom_tile(color = "white", width = 1, height = 1) +
-  facet_grid(Origin ~ ., scales = "free_y", space  = "free_y", switch = "x") +
+  geom_tile(color = "white", 
+            width = 1, 
+            height = 1) +
+  facet_grid(Origin ~ ., 
+             scales = "free_y", 
+             space  = "free_y", 
+             switch = "x") +
   scale_fill_manual(values = c("Increase" = "mediumspringgreen",
                                "Decrease" = "purple", 
                                "No change"  = "grey80"), 
                     guide = guide_legend(order = 2, title.position = "top", 
-                                         title = "T12 vs T0", title.theme = element_markdown(face = "bold", size = 12), 
-                                         title.hjust = 0, label.position = "right", 
-                                         keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
+                                         title = "T12 vs T0", 
+                                         title.theme = element_markdown(face = "bold", 
+                                                                        size = 12), 
+                                         title.hjust = 0, 
+                                         label.position = "right", 
+                                         keywidth = unit(0.5, "cm"), 
+                                         keyheight = unit(0.4, "cm"))) +
   scale_y_discrete(expand = c(0,0)) +
   scale_x_continuous(expand = c(0,0)) +
   theme_void() +
-  theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+  theme(strip.text.y.right = element_text(angle = 0, 
+                                          hjust = 0, 
+                                          vjust = 0.5, 
+                                          face = "bold", 
+                                          margin = margin(l = 10)),
         plot.margin = margin(0, 0, 0, 0), 
         panel.spacing.x = unit(0, "lines"),
         panel.spacing = unit(1, "lines"))
@@ -343,7 +385,9 @@ Combined_Delta <- Main_plot_Delta + Dir_plot_Delta +
         legend.position = "right",
         legend.title.position = "bottom")
 
-# ggsave(Combined_Delta, filename = "~/SLE/Glycans/Plots/Glycans_Correlations_Delta_2.jpeg", width = 10, height = 24, dpi = 300)
+# ggsave(plot = Combined_Delta, 
+#        filename = "~/SLE/Glycans/Plots/Glycans_Correlations_Delta_2.jpeg", 
+#        width = 10, height = 24, dpi = 300)
 
 ```
 
@@ -469,9 +513,8 @@ Multi_Results
 ```
 
 ```{r Visualisation with jtools}
-library(jtools)
-data(movies) 
-fit <- lm(metascore ~ imdb_rating + log(us_gross) + genre5, data = movies)
+
+## Using the summ command from jtools it prints out a nice looking table ##
 summ(Multi_Models$AGP_Clinical, confint = TRUE)
 
 
