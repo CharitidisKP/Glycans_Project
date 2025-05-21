@@ -1,3 +1,11 @@
+---
+title: "Glycans analysis"
+output:
+  pdf_document: default
+  html_document:
+    df_print: kable
+---
+
 ```{r Libraries}
 
 ## Load the libraries ##
@@ -7,6 +15,7 @@ library(purrr)
 library(broom)
 library(ggtext)
 library(patchwork)
+library(caret)
 
 ```
 
@@ -20,8 +29,7 @@ Increased_data <- read_xlsx("~/SLE/Glycans/Data/increased.xlsx")
 IgG_FAB_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
 IgG_FC_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
 IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
-
-
+Glycan_Outcomes <- read_xlsx("~/SLE/Glycans/Data/Glycans_Outcomes.xlsx")
 
 ```
 
@@ -42,8 +50,6 @@ Comparator_Values <- Increased_data %>%
   column_to_rownames("Identification") %>%
   mutate(AI = as.numeric(AI),
          CI = as.numeric(CI))
-
-Comparators <- c("AI", "CI", "S_creatinine", "eGFR", "UPCR", "albumin", "Extra_Renal", "Renal_Impairment", "Clinical")
 
 ```
 
@@ -188,8 +194,8 @@ Main_plot <- ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlati
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
-    x <- gsub("Renal_Extra", "Renal<br>Extra", x)
-    x <- gsub("Renal_Impairment", "Renal<br>Impairment", x)
+    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
   labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
   theme_minimal(base_size = 12) +
@@ -249,8 +255,8 @@ Dataframes_Delta <- Dataframes_Final %>%
 Comparator_Values_Delta <- Increased_data %>%
   rename(ID = `Patient number`, Time_point = `Time point`) %>%
   select(ID, Time_point, any_of(Comparators)) %>%
-  rename(SLEDAI2K = `Renal Impairment`,
-         SLEDAI2K_extra = `extra-renal`,
+  rename(Renal_Impairment = `Renal Impairment`,
+         Extra_Renal = `extra-renal`,
          S_creatinine = `S-creatinine`) %>%
   mutate(AI = as.numeric(AI),
          CI = as.numeric(CI)) %>% 
@@ -295,7 +301,8 @@ Main_plot_Delta <- ggplot(Correlations_Delta, aes(x = Variable, y = Marker, fill
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
-    x <- gsub("SLEDAI2K extra", "SLEDAI2K<br>extra", x)
+    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
   labs(title = "Heatmap of Glycan Deltas Correlations", x = NULL, y = NULL) +
   theme_minimal(base_size = 12) +
@@ -336,15 +343,16 @@ Combined_Delta <- Main_plot_Delta + Dir_plot_Delta +
         legend.position = "right",
         legend.title.position = "bottom")
 
-# ggsave(Combined_Delta, filename = "~/SLE/Glycans/Plots/Glycans_Correlations_Delta.jpeg", width = 10, height = 24, dpi = 300)
+# ggsave(Combined_Delta, filename = "~/SLE/Glycans/Plots/Glycans_Correlations_Delta_2.jpeg", width = 10, height = 24, dpi = 300)
 
 ```
 
 
 
 
-```{r}
+```{r Data prep and model build}
 
+## Prepare the dataframes again ##
 DFs_for_GLMs <- DFs_Combined %>% 
   rownames_to_column(var = "Patients") %>% 
   extract(Patients, into = c("ID", "Timepoint"), 
@@ -355,96 +363,143 @@ DFs_for_GLMs <- DFs_Combined %>%
 
 sapply(DFs_for_GLMs, function(x) sum(is.na(x)))
 
-SLEDAI2K_model <- glm(SLEDAI2K ~ ., data = DFs_for_GLMs %>% select(-c(ID, Timepoint)), family = binomial)
-summary(SLEDAI2K_model)
+## Get the names of the Markers for the comparisons ##
+Candidates <- setdiff(names(DFs_for_GLMs), c("ID", "Timepoint", "Renal_Impairment", "Clinical"))
 
-broom::tidy(SLEDAI2K_model) %>%
-  mutate(OR = exp(estimate),
-         lower = exp(estimate - 1.96 * std.error),
-         upper = exp(estimate + 1.96 * std.error))
+Univ_Results <- map_df(Candidates, function(var){
   
+  ## Build the outcome ~ variable formulas and fit the models ##
+  model_RI <- glm(reformulate(var, "Renal_Impairment"),
+              data = DFs_for_GLMs, family = binomial)
+  model_CL <- glm(reformulate(var, "Clinical"),
+              data = DFs_for_GLMs, family = binomial)
+  
+  ## Extract the predictor row, add OR and CIs as well as an outcome column ##
+  Res_RI <- broom::tidy(model_RI)[2, ] %>%
+    transmute(Marker = var,
+              Outcome = "Renal_Impairment",
+              estimate, std.error, statistic, p.value,
+              OR = exp(estimate),
+              lower = exp(estimate - 1.96 * std.error),
+              upper = exp(estimate + 1.96 * std.error))
+  
+  Res_CL <- broom::tidy(model_CL)[2, ] %>%
+    transmute(Marker = var,
+              Outcome = "Clinical",
+              estimate, std.error, statistic, p.value,
+              OR = exp(estimate),
+              lower = exp(estimate - 1.96 * std.error),
+              upper = exp(estimate + 1.96 * std.error))
+  
+  ## Merge the results ##
+  bind_rows(Res_RI, Res_CL)
+  
+})
+
+Univ_Results
+
 ```
 
-```{r}
+```{r Sanity check}
 
-table(DFs_for_GLMs$SLEDAI2K)
+table(DFs_for_GLMs$Renal_Impairment)
 
-library(caret)
-nzv <- nearZeroVar(DFs_for_GLMs %>% select(-ID, -Timepoint, -SLEDAI2K),
+nzv <- nearZeroVar(DFs_for_GLMs %>% select(-ID, -Timepoint, -Renal_Impairment),
                    saveMetrics=TRUE)
+
 nzv[nzv$zeroVar | nzv$nzv, ]
 
 ```
 
-```{r}
+```{r Multivariate models}
 
-Comparators_clean <- colnames(Comparator_Values)
+Responses <- c("Renal_Impairment", "Clinical")
 
-Top_Markers <- Correlations %>% 
-  filter(Variable == "SLEDAI2K") %>% 
-  arrange(desc(abs(Correlation))) %>% 
-  slice_head(n = 3) %>% 
-  pull(Marker)
-  
-Top_Markers_Origin <- Correlations %>% 
-  filter(Variable == "SLEDAI2K") %>% 
-  group_by(Origin) %>% 
+## Choose the top correlated markers from each category ## 
+Top_Markers <- Correlations %>%
+  filter(Variable == "Renal_Impairment" | Variable == "Clinical") %>% 
+  rename(Response = "Variable") %>% 
+  group_by(Origin, Response) %>% 
   arrange(desc(abs(Correlation))) %>% 
   slice_head(n = 5) %>% 
-  summarise(Markers = list(Marker)) %>% 
-  ungroup() %>% 
+  summarise(Markers = list(Marker), .groups = "drop") %>%
+  mutate(Key = paste(Origin, Response, sep = "_")) %>%
+  select(Key, Markers) %>%
   deframe()
 
-SLEDAI2K_model_sub <- glm(paste("SLEDAI2K ~ ", paste(Top_Markers, collapse = " + ")), 
-                          data = DFs_for_GLMs %>% select(-c(ID, Timepoint)), family = binomial)
-
-summary(SLEDAI2K_model_sub)
-
-broom::tidy(SLEDAI2K_model_sub) %>%
-  mutate(OR = exp(estimate),
-         lower = exp(estimate - 1.96 * std.error),
-         upper = exp(estimate + 1.96 * std.error))
-
-
-
-
-
-
-
-```
-
-```{r}
-
-## Get the names of the Markers for the comparisons ##
-Candidates <- setdiff(names(DFs_for_GLMs), c("ID", "Timepoint", "SLEDAI2K"))
-
-## GLMs for each of the Markers compared to SLEDAI2K ##
-univ_results <- map_df(Candidates, function(var){
+## Create the multi models ##
+Multi_Models <- imap(Top_Markers, ~{
+  # .y corresponds to the subcategory name: "AGP_Renal_Impairment"
+  # .x corresponds to the vector of markers: c("AGP_…","AGP_…",…)
   
-  ## Build the SLEDAI2K ~ variable formulas ##
-  fmla <- reformulate(var, response = "SLEDAI2K")
+  ## Get the type of response ##
+  response <- sub("^[^_]+_(.*)$", "\\1", .y)
   
-  ## Fit the model ##
-  m <- glm(fmla, data = DFs_for_GLMs, family = binomial)
+  ## Build the formulas ##
+  f <- as.formula(paste0(response, " ~ ", paste(.x, collapse = " + ")))
   
-  ## Extract the predictor row, add OR and CIs
-  broom::tidy(m)[2, ] %>%
-    transmute(Marker = var, estimate, std.error, statistic, p.value, 
-              OR = exp(estimate), 
-              lower = exp(estimate - 1.96 * std.error),
-              upper = exp(estimate + 1.96 * std.error))
+  ## Fit and save the models ##
+  glm(formula = f, data = DFs_for_GLMs %>% select(-ID, -Timepoint), family = binomial)
+  
 })
 
-## Adjust p values (Might not be necessary) ##
-# univ_results <- univ_results %>%
-#   mutate(p.adj = p.adjust(p.value, method = "BH"))
+## Make it more redable and convert to a dataframe ##
+Multi_Results <- Multi_Models %>%
+  
+  ## Conver to tribble with the models collapsed under the name of each model ##
+  enframe(name = "Model", value = "Fit") %>%
+  
+  ## For each model, tidy, get ORs and CIs ##
+  mutate(Tidy = map2(Model, Fit, ~ broom::tidy(.y) %>%
+                      filter(term != "(Intercept)") %>%
+                      transmute(Marker = term, estimate, std.error,
+                      statistic, p.value, OR = exp(estimate),
+                      lower = exp(estimate - 1.96 * std.error),
+                      upper = exp(estimate + 1.96 * std.error)))) %>%
+  
+  ## Remove the models ##
+  select(-Fit) %>%
+  
+  ## Unnest the dataframes with the results for each model ##
+  unnest(Tidy)
 
-## Get the significant glms ##
-Univ_sign_p <- univ_results %>% filter(p.value < 0.05)
-Univ_sign_OR <- univ_results %>% arrange(desc(abs(log(OR))))
+# now Multi_Results has one row per Model×Marker with OR & 95% CI
+Multi_Results
+
+```
+
+```{r Visualisation with jtools}
+library(jtools)
+data(movies) 
+fit <- lm(metascore ~ imdb_rating + log(us_gross) + genre5, data = movies)
+summ(Multi_Models$AGP_Clinical, confint = TRUE)
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
