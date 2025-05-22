@@ -18,7 +18,7 @@ library(patchwork)
 library(caret)
 library(jtools)
 library(ggplot2)
-
+library(rlang)
 
 ```
 
@@ -467,6 +467,10 @@ Top_Markers <- Correlations %>%
   arrange(desc(abs(Correlation))) %>% 
   slice_head(n = 5) %>% 
   summarise(Markers = list(Marker), .groups = "drop") %>%
+  group_by(Origin) %>% 
+  mutate(Markers = rep(list(unlist(Markers)), 
+                       n())) %>% 
+  ungroup() %>% 
   mutate(Key = paste(Origin, Response, sep = "_")) %>%
   select(Key, Markers) %>%
   deframe()
@@ -520,20 +524,83 @@ summ(Multi_Models$AGP_Clinical, confint = TRUE)
 
 ```
 
+```{r Effect plots}
+
+for(i in seq_len(nrow(Multi_Results))) {
+  
+  Current_Model_Name <- Multi_Results$Model[i] 
+  Current_Marker <- Multi_Results$Marker[i]
+  Current_Model <- Multi_Models[[Current_Model_Name]]
+  
+  ## Clean the marker name ##
+  x_lab <- gsub("_", " ", Current_Marker)
+  
+  ## Clean the model name ##
+  y_lab <- as.character(formula(Current_Model))[2] %>% 
+    gsub("_", " ", .)
+  
+  ## Plot the effect ##
+  Current_Plot <- effect_plot(Current_Model, 
+                              pred = !!sym(Current_Marker),
+                              interval = TRUE, 
+                              plot.points = TRUE, 
+                              jitter = 0) +
+    labs(x = x_lab, 
+         y = y_lab, 
+         title = paste0("GLM: ", y_lab, " - ", x_lab))
+  
+  Plot_Name <- paste0(Current_Model_Name, 
+                      "_", 
+                      Current_Marker, 
+                      ".jpeg")
+  
+  ggsave(filename = paste0("~/SLE/Glycans/Plots/Effect_Plots/", Plot_Name),
+         plot = Current_Plot,
+         width = 6,
+         height = 4,
+         dpi = 300,
+         device = "jpeg")
+  
+}
 
 
+```
 
 
+```{r}
+
+plot_summs(Multi_Models$AGP_Clinical, 
+           Multi_Models$AGP_Renal_Impairment, 
+           exp = TRUE, 
+           model.names = c("AGP_Clinical", "AGP_Renal_Impairment"))
+
+```
 
 
+```{r}
+Multi_Results <- Multi_Results %>% 
+  mutate(Origin = gsub("_.*", "", Model))
 
+for (i in unique(Multi_Results$Origin)) {
+  
+  Current_Model_1 <- paste0(i, "_Clinical")
+  Current_Model_2 <- paste0(i, "_Renal_Impairment")
+  
+  # grab the actual model objects
+  Model_1 <- Multi_Models[[Current_Model_1]]
+  Model_2 <- Multi_Models[[Current_Model_2]]
+  
+  Current_Plot <- plot_summs(Model_1, 
+                             Model_2,
+                             exp = TRUE, 
+                             model.names = c(Model_1, Model_2)) +
+    labs(x = "Odds Ratio",
+         y = "Predictor",
+         title = paste0("OR comparison: ", i))
 
+}
 
-
-
-
-
-
+```
 
 
 
