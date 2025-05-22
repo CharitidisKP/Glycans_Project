@@ -593,10 +593,13 @@ for (i in unique(Multi_Results$Origin)) {
   Current_Plot <- plot_summs(Model_1, 
                              Model_2,
                              exp = TRUE, 
-                             model.names = c(Model_1, Model_2)) +
+                             model.names = c(Current_Model_1, Current_Model_2)) +
     labs(x = "Odds Ratio",
          y = "Predictor",
-         title = paste0("OR comparison: ", i))
+         title = paste0("OR comparison: ", i)) +
+    scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
+    theme(axis.title.x = element_text(face = "bold"),
+          panel.grid.major.y = element_blank())
 
 }
 
