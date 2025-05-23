@@ -19,6 +19,10 @@ library(caret)
 library(jtools)
 library(ggplot2)
 library(rlang)
+library(logistf) ## Firth’s logistf() ##
+library(glmnet) ## Penalised regression ##
+library(broom.helpers)
+library(scales)
 
 ```
 
@@ -239,7 +243,9 @@ Combined_Plot <- Main_plot + Dir_plot +
         legend.position = "right",
         legend.title.position = "bottom")
 
-# ggsave(Combined_Plot, filename = "~/SLE/Glycans/Plots/Glycans_Correlations_2.jpeg", width = 10, height = 16, dpi = 300)
+# ggsave(Combined_Plot, 
+#        filename = "~/SLE/Glycans/Plots/Glycans_Correlations_2.jpeg", 
+#        width = 10, height = 16, dpi = 300)
 
 ```
 
@@ -554,30 +560,20 @@ for(i in seq_len(nrow(Multi_Results))) {
                       Current_Marker, 
                       ".jpeg")
   
-  ggsave(filename = paste0("~/SLE/Glycans/Plots/Effect_Plots/", Plot_Name),
-         plot = Current_Plot,
-         width = 6,
-         height = 4,
-         dpi = 300,
-         device = "jpeg")
+  # ggsave(filename = paste0("~/SLE/Glycans/Plots/Effect_Plots/", Plot_Name),
+  #        plot = Current_Plot,
+  #        width = 6,
+  #        height = 4,
+  #        dpi = 300,
+  #        device = "jpeg")
   
 }
 
 
 ```
 
-
 ```{r}
 
-plot_summs(Multi_Models$AGP_Clinical, 
-           Multi_Models$AGP_Renal_Impairment, 
-           exp = TRUE, 
-           model.names = c("AGP_Clinical", "AGP_Renal_Impairment"))
-
-```
-
-
-```{r}
 Multi_Results <- Multi_Results %>% 
   mutate(Origin = gsub("_.*", "", Model))
 
@@ -590,28 +586,117 @@ for (i in unique(Multi_Results$Origin)) {
   Model_1 <- Multi_Models[[Current_Model_1]]
   Model_2 <- Multi_Models[[Current_Model_2]]
   
-  Current_Plot <- plot_summs(Model_1, 
-                             Model_2,
-                             exp = TRUE, 
-                             model.names = c(Current_Model_1, Current_Model_2)) +
+  Current_Plot_ORs <- plot_summs(Model_1, 
+                                 Model_2,
+                                 exp = TRUE, 
+                                 model.names = c("Clinical", 
+                                                 "Renal Impairment")) +
     labs(x = "Odds Ratio",
          y = "Predictor",
-         title = paste0("OR comparison: ", i)) +
+         title = paste0("GLM, Odds Ratio: ", i)) +
+    scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
+    scale_x_continuous(labels = label_scientific(digits = 2)) +
+    theme(axis.title.x = element_text(face = "bold"),
+          panel.grid.major.y = element_blank(), 
+          axis.text.y = element_text(face = "bold"), 
+          plot.title = element_text(hjust = 0))
+  
+  OR_Plot_Name <- paste0("GLM_", i, "_ORs.jpeg")
+  
+  Current_Plot_Estimates <- plot_summs(Model_1, 
+                                       Model_2,
+                                       model.names = c("Clinical",
+                                                       "Renal Impairment")) +
+    labs(x = "Estimate",
+         y = "Predictor",
+         title = paste0("GLM, Estimates: ", i)) +
     scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
     theme(axis.title.x = element_text(face = "bold"),
-          panel.grid.major.y = element_blank())
-
+          panel.grid.major.y = element_blank(), 
+          plot.title = element_text(hjust = 0))
+  
+  Estimates_Plot_Name <- paste0("GLM_", i, "_Estimates.jpeg")
+  
+  ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM/ORs/", OR_Plot_Name),
+         plot = Current_Plot_ORs,
+         width = 10,
+         height = 6,
+         dpi = 300,
+         device = "jpeg")
+  
+  ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM/Estimates/", Estimates_Plot_Name),
+         plot = Current_Plot_Estimates,
+         width = 10,
+         height = 6,
+         dpi = 300,
+         device = "jpeg")
 }
+
+```
+
+```{r Other models}
+
+Multi_Models_Firth <- imap(Top_Markers, ~{
+  ## .y is like "AGP_Clinical", .x is the vector of top markers
+  
+  ## extract response and build formula
+  response <- sub("^[^_]+_(.*)$", "\\1", .y)
+  f        <- as.formula(paste0(response, " ~ ", paste(.x, collapse = " + ")))
+  data     <- DFs_for_GLMs %>% select(-ID, -Timepoint)
+  
+  ## Firth’s bias‐reduced model ##
+  firth_mod <- logistf(formula = f, 
+                       data = data,
+                       control = logistf.control(maxit = 200, maxstep =  50),    
+                       plcontrol = logistf.control(maxit = 200))
+})
+
+
+Multi_Models_Penalised <- imap(Top_Markers, ~{
+  ## .y is like "AGP_Clinical", .x is the vector of top markers
+  
+  ## extract response and build formula
+  response <- sub("^[^_]+_(.*)$", "\\1", .y)
+  f        <- as.formula(paste0(response, " ~ ", paste(.x, collapse = " + ")))
+  data     <- DFs_for_GLMs %>% select(-ID, -Timepoint)
+
+  X   <- model.matrix(f, data = data)[, -1, drop = FALSE]
+  y   <- data[[response]]
+  cv  <- cv.glmnet(X, y, family = "binomial", alpha = 0)
+  
+  pen_mod <- glmnet(x = X, 
+                    y = y, 
+                    family = "binomial", 
+                    alpha = 0, 
+                    lambda = cv$lambda.min)
+})
 
 ```
 
 
 
+```{r}
+
+Multi_Results_Firth %>%
+  purrr::map_df(Multi_Models_Firth,
+                ~ broom.helpers::tidy_with_broom_or_parameters(.x,
+                                                               conf.int = TRUE,
+                                                               conf.level = 0.95,
+                                                               exponentiate = TRUE), 
+                .id = "Model") %>%
+  dplyr::filter(term != "(Intercept)")
 
 
-
-
-
+# MultiResults_Penalised <- 
+imap_dfr(Multi_Models_Penalised, ~ {
+  cm <- as.matrix(coef(.x))
+    tibble(Model = .y,
+           Method = "penalized",
+           Marker = rownames(cm)[-1],
+           estimate = cm[-1, 1] %>% as.numeric(),
+           OR = exp(cm[-1, 1]))
+  })
+```
 
 
 
