@@ -617,19 +617,19 @@ for (i in unique(Multi_Results$Origin)) {
   
   Estimates_Plot_Name <- paste0("GLM_", i, "_Estimates.jpeg")
   
-  ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM/ORs/", OR_Plot_Name),
-         plot = Current_Plot_ORs,
-         width = 10,
-         height = 6,
-         dpi = 300,
-         device = "jpeg")
-  
-  ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM/Estimates/", Estimates_Plot_Name),
-         plot = Current_Plot_Estimates,
-         width = 10,
-         height = 6,
-         dpi = 300,
-         device = "jpeg")
+  # ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM/ORs/", OR_Plot_Name),
+  #        plot = Current_Plot_ORs,
+  #        width = 10,
+  #        height = 6,
+  #        dpi = 300,
+  #        device = "jpeg")
+  # 
+  # ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM/Estimates/", Estimates_Plot_Name),
+  #        plot = Current_Plot_Estimates,
+  #        width = 10,
+  #        height = 6,
+  #        dpi = 300,
+  #        device = "jpeg")
 }
 
 ```
@@ -677,8 +677,7 @@ Multi_Models_Penalised <- imap(Top_Markers, ~{
 
 ```{r}
 
-Multi_Results_Firth %>%
-  purrr::map_df(Multi_Models_Firth,
+Multi_Results_Firth <- purrr::map_df(Multi_Models_Firth,
                 ~ broom.helpers::tidy_with_broom_or_parameters(.x,
                                                                conf.int = TRUE,
                                                                conf.level = 0.95,
@@ -687,8 +686,7 @@ Multi_Results_Firth %>%
   dplyr::filter(term != "(Intercept)")
 
 
-# MultiResults_Penalised <- 
-imap_dfr(Multi_Models_Penalised, ~ {
+MultiResults_Penalised <- imap_dfr(Multi_Models_Penalised, ~ {
   cm <- as.matrix(coef(.x))
     tibble(Model = .y,
            Method = "penalized",
@@ -698,6 +696,14 @@ imap_dfr(Multi_Models_Penalised, ~ {
   })
 ```
 
+```{r}
+
+plot_summs(Multi_Models_Firth$AGP_Clinical, 
+                                 Multi_Models_Firth$AGP_Renal_Impairment,
+                                 exp = TRUE, 
+                                 model.names = c("Clinical", 
+                                                 "Renal Impairment"))
+```
 
 
 
