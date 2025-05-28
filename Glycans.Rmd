@@ -106,7 +106,82 @@ Directions <- bind_rows(Directions_List)
 
 ```
 
-```{r Perform the tests}
+```{r}
+
+Normality_By_Time <- function(df){
+  df %>% 
+    pivot_wider(names_from   = Time_point,
+                values_from  = Value,
+                names_prefix = "Value_") %>% 
+    group_by(Marker) %>% 
+    summarise(
+      N              = n_distinct(ID),
+      # run Shapiro on T0 and T12
+      SW_T0_list     = list(shapiro.test(Value_T0)),
+      SW_T12_list    = list(shapiro.test(Value_T12)),
+      .groups = "drop"
+    ) %>% 
+    mutate(
+      SW_T0  = map(SW_T0_list,  tidy),
+      SW_T12 = map(SW_T12_list, tidy)
+    ) %>% 
+    unnest(c(SW_T0, SW_T12), names_sep = ".") %>% 
+    select(
+      Marker, N,
+      # columns from SW_T0.*
+      statistic.T0  = SW_T0.statistic,
+      p.value.T0    = SW_T0.p.value,
+      method.T0     = SW_T0.method,
+      # columns from SW_T12.*
+      statistic.T12 = SW_T12.statistic,
+      p.value.T12   = SW_T12.p.value,
+      method.T12    = SW_T12.method
+    )
+}
+
+# 2) Test normality of the paired differences
+Normality_Differences <- function(df){
+  df %>% 
+    pivot_wider(names_from   = Time_point,
+                values_from  = Value,
+                names_prefix = "Value_") %>% 
+    group_by(Marker) %>% 
+    summarise(
+      N           = n_distinct(ID),
+      diff        = list(Value_T12 - Value_T0),
+      SW_diff     = list(shapiro.test(Value_T12 - Value_T0)),
+      .groups = "drop"
+    ) %>% 
+    mutate(
+      SW = map(SW_diff, tidy)
+    ) %>% 
+    unnest(SW) %>% 
+    select(
+      Marker, N,
+      statistic,        # Shapiro–Wilk W
+      p.value,          # its p‐value
+      method
+    )
+}
+
+# Apply to each dataframe in your list, tagging by origin
+Test_Normality <- imap(Long_Dataframes, ~{
+  res1 <- Normality_By_Time(.x)       %>% mutate(Origin = .y)
+  res2 <- Normality_Differences(.x)   %>% mutate(Origin = .y)
+  list(by_time = res1, differences = res2)
+})
+
+# Bind rows if you want long tables for each approach:
+Normality_By_Time_Results <- map_dfr(Test_Normality, "by_time")
+Normality_Diffs_Results       <- map_dfr(Test_Normality, "differences")
+
+Normality_By_Time_Results %>% 
+  filter(p.value.T12 > 0.05)
+
+```
+
+
+```{r Perform the wilcox tests}
 
 Paired_Tests <- function(df){ df %>% 
   pivot_wider(names_from = "Time_point", values_from = "Value", names_prefix = "Value_") %>% 
@@ -126,6 +201,33 @@ Test_Results <- imap(Long_Dataframes, ~Paired_Tests(.x) %>%
                        mutate(Marker = paste0(.y, "_", Marker)))
 
 Test_Results <- bind_rows(Test_Results, .id = "Origin")
+Test_Results %>% 
+  filter(p.value < 0.05)
+
+```
+
+```{r Perform the paired t tests}
+
+Paired_t_Tests <- function(df){ df %>% 
+  pivot_wider(names_from = "Time_point", values_from = "Value", names_prefix = "Value_") %>% 
+  group_by(Marker) %>% 
+  summarise(Pairs = n_distinct(ID),
+            Test = list(t.test(Value_T12, 
+                                    Value_T0, 
+                                    paired = TRUE)), 
+                        .groups = "drop") %>% 
+  mutate(Results = map(Test, broom::tidy)) %>% 
+  unnest(Results) %>% 
+  select(Marker, Pairs, statistic, p.value, method)
+}
+
+t_Test_Results <- imap(Long_Dataframes, ~Paired_t_Tests(.x) %>% 
+                       mutate(Marker = paste0(.y, "_", Marker)))
+
+t_Test_Results <- bind_rows(Test_Results, .id = "Origin")
+
+t_Test_Results %>% 
+  filter(p.value < 0.05)
 
 ```
 
