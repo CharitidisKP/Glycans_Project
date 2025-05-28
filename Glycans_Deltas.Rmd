@@ -798,9 +798,17 @@ tidy.logistf <- function(x, conf.int = TRUE, conf.level = 0.95, ...) {
 ```{r Jtools Visualisation - Firths Penalised GLMs}
 
 Multi_Results_Firth_Clean <- Multi_Results_Firth %>% 
+  select(Model, 
+         Marker = term, 
+         estimate, 
+         lower = conf.low, 
+         higher = conf.high) %>% 
   mutate(Origin = gsub("_.*", "", Model), 
-         Model = sub("^[^_]+_", "", Model))
-
+         Model = sub("^[^_]+_", "", Model), 
+         Marker = str_replace_all(Marker, "_", " "), 
+         lowerOR = exp(lower), 
+         upperOR = exp(higher))
+  
 for (i in unique(Multi_Results_Firth_Clean$Origin)) {
   
   Current_Model_1 <- paste0(i, "_Clinical_Response")
@@ -852,26 +860,26 @@ for (i in unique(Multi_Results_Firth_Clean$Origin)) {
   
   Estimates_Plot_Name <- paste0("GLM_", i, "_Estimates.jpeg")
   
-  ggsave(filename = paste0("~/SLE/Glycans/Plots/Firth_GLM_Delta/ORs/", OR_Plot_Name),
-         plot = Current_Plot_ORs,
-         width = 10,
-         height = 6,
-         dpi = 300,
-         device = "jpeg")
-
-  ggsave(filename = paste0("~/SLE/Glycans/Plots/Firth_GLM_Delta/Estimates/", Estimates_Plot_Name),
-         plot = Current_Plot_Estimates,
-         width = 10,
-         height = 6,
-         dpi = 300,
-         device = "jpeg")
+  # ggsave(filename = paste0("~/SLE/Glycans/Plots/Firth_GLM_Delta/ORs/", OR_Plot_Name),
+  #        plot = Current_Plot_ORs,
+  #        width = 10,
+  #        height = 6,
+  #        dpi = 300,
+  #        device = "jpeg")
+  # 
+  # ggsave(filename = paste0("~/SLE/Glycans/Plots/Firth_GLM_Delta/Estimates/", Estimates_Plot_Name),
+  #        plot = Current_Plot_Estimates,
+  #        width = 10,
+  #        height = 6,
+  #        dpi = 300,
+  #        device = "jpeg")
 }
 
 ```
 
 ```{r Visualisation manual}
 
-ggplot(firth_results, aes(x = OR, y = Marker, color = Model)) +
+ggplot(Multi_Results_Firth_Clean, aes(x = OR, y = Marker, color = Model)) +
   geom_point(position = position_dodge(width = 0.7), size = 3) +
   geom_errorbarh(aes(xmin = lower, xmax = upper),
                  position = position_dodge(width = 0.7),
@@ -883,6 +891,13 @@ ggplot(firth_results, aes(x = OR, y = Marker, color = Model)) +
     color = "Model"
   ) +
   theme_minimal()
+
+```
+
+
+```{r}
+
+Multi_Results_Firth_Clean %>% filter(p.value < 0.05)
 
 ```
 
