@@ -23,6 +23,8 @@ library(logistf) ## Firth’s logistf() ##
 library(glmnet) ## Penalised regression ##
 library(broom.helpers)
 library(scales)
+library(patchwork)
+library(grid)
 
 ```
 
@@ -770,6 +772,20 @@ Multi_Results_Firth <- purrr::map_df(Multi_Models_Firth,
 #            estimate = cm[-1, 1] %>% as.numeric(),
 #            OR = exp(cm[-1, 1]))
 #   })
+
+Multi_Results_Firth_Clean <- Multi_Results_Firth %>% 
+  select(Model, 
+         Marker = term, 
+         estimate, 
+         lower = conf.low, 
+         higher = conf.high) %>% 
+  mutate(Origin = gsub("_.*", "", Model), 
+         Model = sub("^[^_]+_", "", Model), 
+         Marker = str_replace_all(Marker, "_", " "), 
+         OR = exp(estimate), 
+         lowerOR = exp(lower), 
+         upperOR = exp(higher))
+
 ```
 
 ```{r Function for jtools to work with logistf}
@@ -797,18 +813,6 @@ tidy.logistf <- function(x, conf.int = TRUE, conf.level = 0.95, ...) {
 
 ```{r Jtools Visualisation - Firths Penalised GLMs}
 
-Multi_Results_Firth_Clean <- Multi_Results_Firth %>% 
-  select(Model, 
-         Marker = term, 
-         estimate, 
-         lower = conf.low, 
-         higher = conf.high) %>% 
-  mutate(Origin = gsub("_.*", "", Model), 
-         Model = sub("^[^_]+_", "", Model), 
-         Marker = str_replace_all(Marker, "_", " "), 
-         lowerOR = exp(lower), 
-         upperOR = exp(higher))
-  
 for (i in unique(Multi_Results_Firth_Clean$Origin)) {
   
   Current_Model_1 <- paste0(i, "_Clinical_Response")
@@ -877,27 +881,148 @@ for (i in unique(Multi_Results_Firth_Clean$Origin)) {
 
 ```
 
-```{r Visualisation manual}
+```{r Visualisation manual - Estimates}
 
-ggplot(Multi_Results_Firth_Clean, aes(x = OR, y = Marker, color = Model)) +
-  geom_point(position = position_dodge(width = 0.7), size = 3) +
-  geom_errorbarh(aes(xmin = lower, xmax = upper),
-                 position = position_dodge(width = 0.7),
-                 height   = 0.2) +
-  scale_x_log10() +
-  labs(
-    x     = "Odds Ratio (log scale)",
-    y     = "Marker",
-    color = "Model"
-  ) +
-  theme_minimal()
+Estimate_Plots <- Multi_Results_Firth_Clean %>%
+  group_split(Origin) %>%
+  set_names(map_chr(., ~ unique(.x$Origin))) %>%
+  imap(function(df, name) {
+    p <- ggplot(df, aes(x = estimate, y = Marker, color = Model)) +
+      geom_point(position = position_dodge(0.6), size = 3) +
+      geom_errorbarh(aes(xmin = lower, xmax = higher),
+                     position = position_dodge(0.6),
+                     height = 0.2) +
+      # scale_color_discrete(name = NULL,
+      #                      labels = c(expression(atop(bold("Short term outcome:"), "Clinical Response")),
+      #                                 expression(atop(bold("Long term outcome:"), "Renal Impairment"))),
+      #                      guide = guide_legend(label.hjust = 0, ncol = 1, nrow = 2)) +
+      scale_color_discrete(name = NULL,
+                           labels = c("**Short term outcome:**<br>Clinical Response",
+                                      "<br>**Long term outcome:**<br>Renal Impairment")) +
+      
+      labs(title = name) +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0, face = "bold"),
+            panel.grid.major.y = element_blank(), 
+            axis.title.y = element_blank(),
+            axis.text.y = element_text(face = "bold"),
+            axis.title.x = element_blank(), 
+            axis.ticks.x = element_blank(), 
+            legend.text = element_markdown(size = 10))
+    p
+  })
+
+# 2) compute relative heights so panels scale with marker counts
+Plot_Heights <- map_int(Estimate_Plots, ~ nrow(Multi_Results_Firth_Clean %>% 
+                                   filter(Origin == unique(.x$data$Origin))))
+
+# — 3) Wrap them in one column, collect the legend, and inject a gap —
+Estimate_Plots_wrap <- wrap_plots(Estimate_Plots, 
+                           ncol = 1, 
+                           heights = Plot_Heights, 
+                           guides  = "collect") 
+
+# — 4) Create the shared x‐axis label with minimal bottom gap —
+Plot_x_axis <- ggplot() +
+  labs(x = "Estimate (Log-Odds)") +
+  theme_void() +
+  theme(axis.title.x = element_text(face = "bold", size = 12),
+        plot.margin  = margin(t = 0, r = 0, b = 0, l = 10))
+
+Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
+                         ncol = 1,
+                         heights = c(sum(heights), 1), 
+                         guides  = "collect") +
+  plot_annotation(title = "Firth-Penalized logistic regression results - Estimates",
+                  theme = theme(plot.title.position = "plot",
+                                plot.title = element_text(size = 16, 
+                                                          face = "bold", 
+                                                          hjust = 0))) &
+  theme(legend.position = "right")
+
+ggsave(plot = Final_Estimate_Plot,
+       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_Total.jpeg",
+       height = 12, width = 10, dpi = 300, device = "jpeg")
+
 
 ```
 
+```{r Visualisation manual - Odds Ratio}
 
-```{r}
+Estimate_Plots <- Multi_Results_Firth_Clean %>%
+  group_split(Origin) %>%
+  set_names(map_chr(., ~ unique(.x$Origin))) %>%
+  imap(function(df, name) {
+    p <- ggplot(df, aes(x = OR, y = Marker, color = Model)) +
+      geom_point(position = position_dodge(0.6), size = 3) +
+      geom_errorbarh(aes(xmin = lowerOR, xmax = upperOR),
+                     position = position_dodge(0.6),
+                     height = 0.2) +
+      scale_color_discrete(name = NULL,
+                           labels = c("**Short term outcome:**<br>Clinical Response",
+                                      "<br>**Long term outcome:**<br>Renal Impairment")) +
+      labs(title = name) +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0, face = "bold"),
+            panel.grid.major.y = element_blank(), 
+            axis.title.y = element_blank(),
+            axis.text.y = element_text(face = "bold"),
+            axis.title.x = element_blank(), 
+            axis.ticks.x = element_blank(), 
+            legend.text = element_markdown(size = 10))
+    p
+  })
 
-Multi_Results_Firth_Clean %>% filter(p.value < 0.05)
+# 2) compute relative heights so panels scale with marker counts
+Plot_Heights <- map_int(Estimate_Plots, ~ nrow(Multi_Results_Firth_Clean %>% 
+                                   filter(Origin == unique(.x$data$Origin))))
+
+# — 3) Wrap them in one column, collect the legend, and inject a gap —
+Estimate_Plots_wrap <- wrap_plots(Estimate_Plots, 
+                           ncol = 1, 
+                           heights = Plot_Heights, 
+                           guides  = "collect") 
+
+# — 4) Create the shared x‐axis label with minimal bottom gap —
+Plot_x_axis <- ggplot() +
+  labs(x = "Odds Ratio (Log10 scaled)") +
+  theme_void() +
+  theme(axis.title.x = element_text(face = "bold", size = 12),
+        plot.margin  = margin(t = 0, r = 0, b = 0, l = 10))
+
+Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
+                         ncol = 1,
+                         heights = c(sum(heights), 1), 
+                         guides  = "collect") +
+  plot_annotation(title = "Firth-Penalized logistic regression results - Odds Ratio",
+                  theme = theme(plot.title.position = "plot",
+                                plot.title = element_text(size = 16, 
+                                                          face = "bold", 
+                                                          hjust = 0))) &
+  theme(legend.position = "right")
+
+ggsave(plot = Final_Estimate_Plot,
+       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total.jpeg",
+       height = 12, width = 10, dpi = 300, device = "jpeg")
+
+
+Estimate_Plots_log10 <- Estimate_Plots_wrap & 
+  scale_x_log10()
+
+Final_log10 <- wrap_plots(list(Estimate_Plots_log10, Plot_x_axis),
+                         ncol = 1,
+                         heights = c(sum(heights), 1), 
+                         guides  = "collect") +
+  plot_annotation(title = "Firth-Penalized logistic regression results - Odds Ratio",
+                  theme = theme(plot.title.position = "plot",
+                                plot.title = element_text(size = 16, 
+                                                          face = "bold", 
+                                                          hjust = 0))) &
+  theme(legend.position = "right")
+
+ggsave(plot = Final_log10,
+       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total_log10_scale.jpeg",
+       height = 12, width = 10, dpi = 300, device = "jpeg")
+
 
 ```
-
