@@ -838,8 +838,9 @@ Multi_Results_Firth_Clean <- Multi_Results_Firth %>%
          OR = exp(estimate), 
          lowerOR = exp(lower), 
          upperOR = exp(higher), 
-         do_annotate = Marker %in% Annotate_these,
-         Marker_label = if_else(do_annotate,
+         # do_annotate = Marker %in% Annotate_these,
+         sig = p.value < 0.05,
+         Marker_label = if_else(sig,
                                 paste0("<span style='color:red; font-weight:bold; font-size:12pt; vertical-align:-10px;'>*</span>\u2002",
                                        Marker_Clean), 
                                 Marker_Clean)) 
@@ -998,9 +999,9 @@ Firth_Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
                                                           hjust = 0))) &
   theme(legend.position = "right")
 
-# ggsave(plot = Firth_Final_Estimate_Plot,
-#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_Total.jpeg",
-#        height = 18, width = 10, dpi = 300, device = "jpeg")
+ggsave(plot = Firth_Final_Estimate_Plot,
+       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_Total.jpeg",
+       height = 18, width = 10, dpi = 300, device = "jpeg")
 
 Firth_Final_Estimate_Plot
 ```
@@ -1063,9 +1064,9 @@ Firth_Final_OR_Plot <- wrap_plots(list(OR_Plots_wrap, Plot_x_axis),
                                                           hjust = 0))) &
   theme(legend.position = "right")
 
-# ggsave(plot = Firth_Final_OR_Plot,
-#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total.jpeg",
-#        height = 18, width = 10, dpi = 300, device = "jpeg")
+ggsave(plot = Firth_Final_OR_Plot,
+       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total.jpeg",
+       height = 18, width = 10, dpi = 300, device = "jpeg")
 
 
 OR_Plots_wrap_log10 <- OR_Plots_wrap & 
@@ -1088,9 +1089,9 @@ Firth_Final_log10 <- wrap_plots(list(OR_Plots_wrap_log10, Plot_x_axis_log10),
                                                           hjust = 0))) &
   theme(legend.position = "right")
 
-# ggsave(plot = Firth_Final_log10,
-#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total_log10_scale.jpeg",
-#        height = 18, width = 10, dpi = 300, device = "jpeg")
+ggsave(plot = Firth_Final_log10,
+       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total_log10_scale.jpeg",
+       height = 18, width = 10, dpi = 300, device = "jpeg")
 
 Firth_Final_OR_Plot
 Firth_Final_log10
@@ -1132,14 +1133,13 @@ Multi_Results_Clean <- Multi_Results %>%
     upperOR = upper,
     
     # flag exactly those in your Annotate_these list
-    do_annotate = Marker %in% Annotate_these,
-    Marker_label = if_else(
-      do_annotate,
-      # big star, then thin space, then the cleaned name
-      paste0("<span style='color:red; font-weight:bold; font-size:12pt; vertical-align:-10px;'>*</span>\u2002",
-             Marker_Clean),
-      Marker_Clean)) %>% 
-  select(Origin, Model, Marker = Marker_Clean, Marker_label,
+    # do_annotate = Marker %in% Annotate_these,
+    sig = p.value < 0.05,
+    Marker_label = if_else(sig,
+                           paste0("<span style='color:red; font-weight:bold; font-size:12pt; vertical-align:-10px;'>*</span>\u2002",
+                                  Marker_Clean), 
+                           Marker_Clean)) %>% 
+  select(Origin, Model, Marker = Marker_Clean, Marker_label, sig,
          estimate, lower_est, higher_est, lowerOR, upperOR, OR, p.value)
 
 
