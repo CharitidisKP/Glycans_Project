@@ -25,6 +25,8 @@ library(broom.helpers)
 library(scales)
 library(patchwork)
 library(grid)
+library(scales)
+library(writexl)
 
 ```
 
@@ -69,7 +71,8 @@ Dataframes <- list(AGP = AGP_Data,
                    C3 = C3_Data, 
                    Serum = Serum_Data,
                    Fab = IgG_FAB_Data, 
-                   Fc = IgG_FC_Data)
+                   Fc = IgG_FC_Data, 
+                   IgG = IgG_Meta)
 
 Process_DFs <- function(df){
   df %>% 
@@ -182,7 +185,8 @@ Dataframes_Final_Sign_Wide <- Dataframes_Final_Sign %>%
   mutate(ID = paste0(ID, " ", Time_point)) %>% 
   select(-c(Time_point, Origin)) %>% 
   pivot_wider(id_cols = ID, names_from = "Marker", values_from = "Value") %>% 
-  column_to_rownames(var = "ID")
+  column_to_rownames(var = "ID") %>% 
+  mutate(across(where(is.numeric), ~ round(., 5)))
 
 # Correlations <- cor(Dataframes_Final_Sign_Wide, 
 #                     Comparator_Values, 
@@ -272,8 +276,8 @@ Combined_Plot <- Main_plot + Dir_plot +
         legend.position = "right",
         legend.title.position = "bottom")
 
-# ggsave(Combined_Plot, 
-#        filename = "~/SLE/Glycans/Plots/Glycans_Correlations_2.jpeg", 
+# ggsave(Combined_Plot,
+#        filename = "~/SLE/Glycans/Plots/Glycans_Correlations_final.jpeg",
 #        width = 10, height = 16, dpi = 300)
 
 ```
@@ -542,13 +546,16 @@ nzv[nzv$zeroVar | nzv$nzv, ]
 
 Responses <- c("Renal_Impairment", "Clinical_Response")
 
+Annotations <- Correlations %>% 
+  select(Marker, Significance)
+
 ## Choose the top correlated markers from each category ## 
 Top_Markers <- Correlations %>%
   filter(Variable == "Renal_Impairment" | Variable == "Clinical_Response") %>% 
   rename(Response = "Variable") %>% 
   group_by(Origin, Response) %>% 
-  arrange(desc(abs(Correlation))) %>% 
-  slice_head(n = 5) %>% 
+  # arrange(desc(abs(Correlation))) %>% 
+  # slice_head(n = 5) %>% 
   summarise(Markers = list(Marker), .groups = "drop") %>%
   group_by(Origin) %>% 
   mutate(Markers = rep(list(unlist(Markers)), 
@@ -596,6 +603,7 @@ Multi_Results <- Multi_Models %>%
 
 # now Multi_Results has one row per Model×Marker with OR & 95% CI
 Multi_Results
+# write_xlsx(x = Multi_Results, path = "~/SLE/Glycans/GLM_Results.xlsx")
 
 ```
 
@@ -649,53 +657,53 @@ for(i in seq_len(nrow(Multi_Results))) {
 
 ```{r Jtools visualisation - Normal GLM}
 
-Multi_Results <- Multi_Results %>% 
-  mutate(Origin = gsub("_.*", "", Model))
-
-for (i in unique(Multi_Results$Origin)) {
-  
-  Current_Model_1 <- paste0(i, "_Clinical_Response")
-  Current_Model_2 <- paste0(i, "_Renal_Impairment")
-  
-  # grab the actual model objects
-  Model_1 <- Multi_Models[[Current_Model_1]]
-  Model_2 <- Multi_Models[[Current_Model_2]]
-  
-  Current_Plot_ORs <- plot_summs(Model_1, 
-                                 Model_2,
-                                 exp = TRUE, 
-                                 model.names = c("Clinical Response", 
-                                                 "Renal Impairment")) +
-    labs(x = "Odds Ratio",
-         y = "Predictor",
-         title = paste0("GLM, Odds Ratio: ", i)) +
-    scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
-    scale_x_continuous(labels = label_scientific(digits = 2)) +
-    theme(axis.title.x = element_text(face = "bold"),
-          panel.grid.major.y = element_blank(), 
-          axis.text.y = element_text(face = "bold"), 
-          plot.title = element_text(hjust = 0))
-  
-  OR_Plot_Name <- paste0("GLM_", i, "_ORs.jpeg")
-  
-  names(coef(Model_1))
-  Current_Plot_Estimates <- plot_summs(Model_1, 
-                                       Model_2,
-                                       model.names = c("Clinical Response",
-                                                       "Renal Impairment"), 
-                                       coefs = good.coefs,
-                                       plot.distributions = FALSE) +
-    labs(x = "Estimate (Log Odds)",
-         y = "Predictor",
-         title = paste0("GLM, Estimates: ", i)) +
-    scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
-    theme(axis.title.x = element_text(face = "bold"),
-          panel.grid.major.y = element_blank(), 
-          axis.text.y = element_text(face = "bold"), 
-          plot.title = element_text(hjust = 0))
-  
-  Estimates_Plot_Name <- paste0("GLM_", i, "_Estimates.jpeg")
-  
+# Multi_Results <- Multi_Results %>% 
+#   mutate(Origin = gsub("_.*", "", Model))
+# 
+# for (i in unique(Multi_Results$Origin)) {
+#   
+#   Current_Model_1 <- paste0(i, "_Clinical_Response")
+#   Current_Model_2 <- paste0(i, "_Renal_Impairment")
+#   
+#   # grab the actual model objects
+#   Model_1 <- Multi_Models[[Current_Model_1]]
+#   Model_2 <- Multi_Models[[Current_Model_2]]
+#   
+#   Current_Plot_ORs <- plot_summs(Model_1, 
+#                                  Model_2,
+#                                  exp = TRUE, 
+#                                  model.names = c("Clinical Response", 
+#                                                  "Renal Impairment")) +
+#     labs(x = "Odds Ratio",
+#          y = "Predictor",
+#          title = paste0("GLM, Odds Ratio: ", i)) +
+#     scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
+#     scale_x_continuous(labels = label_scientific(digits = 2)) +
+#     theme(axis.title.x = element_text(face = "bold"),
+#           panel.grid.major.y = element_blank(), 
+#           axis.text.y = element_text(face = "bold"), 
+#           plot.title = element_text(hjust = 0))
+#   
+#   OR_Plot_Name <- paste0("GLM_", i, "_ORs.jpeg")
+#   
+#   names(coef(Model_1))
+#   Current_Plot_Estimates <- plot_summs(Model_1, 
+#                                        Model_2,
+#                                        model.names = c("Clinical Response",
+#                                                        "Renal Impairment"), 
+#                                        coefs = good.coefs,
+#                                        plot.distributions = FALSE) +
+#     labs(x = "Estimate (Log Odds)",
+#          y = "Predictor",
+#          title = paste0("GLM, Estimates: ", i)) +
+#     scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
+#     theme(axis.title.x = element_text(face = "bold"),
+#           panel.grid.major.y = element_blank(), 
+#           axis.text.y = element_text(face = "bold"), 
+#           plot.title = element_text(hjust = 0))
+#   
+#   Estimates_Plot_Name <- paste0("GLM_", i, "_Estimates.jpeg")
+#   
   # ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM_Deltas/ORs/", OR_Plot_Name),
   #        plot = Current_Plot_ORs,
   #        width = 10,
@@ -709,27 +717,66 @@ for (i in unique(Multi_Results$Origin)) {
   #        height = 6,
   #        dpi = 300,
   #        device = "jpeg")
-}
+# }
 
 ```
 
+
 ```{r Other models}
 
-Multi_Models_Firth <- imap(Top_Markers, ~{
+Non_NA_Markers <- Multi_Results %>% 
+  drop_na() %>% 
+  pull(Marker)
+
+## Choose the top correlated markers from each category ## 
+Top_Markers_Clean <- Correlations %>%
+  filter(Variable == "Renal_Impairment" | Variable == "Clinical_Response") %>% 
+  rename(Response = "Variable") %>% 
+  filter(Marker %in% Non_NA_Markers) %>% 
+  group_by(Origin, Response) %>% 
+  # arrange(desc(abs(Correlation))) %>% 
+  # slice_head(n = 5) %>% 
+  summarise(Markers = list(Marker), .groups = "drop") %>%
+  group_by(Origin) %>% 
+  mutate(Markers = rep(list(unlist(Markers)), 
+                       n())) %>% 
+  ungroup() %>% 
+  mutate(Key = paste(Origin, Response, sep = "_")) %>%
+  select(Key, Markers) %>%
+  deframe()
+
+# Multi_Models_Firth <- imap(Top_Markers_Clean, ~{
+#   ## .y is like "AGP_Clinical", .x is the vector of top markers
+#   
+#   ## extract response and build formula
+#   response <- sub("^[^_]+_(.*)$", "\\1", .y)
+#   f        <- as.formula(paste0(response, " ~ ", paste(.x, collapse = " + ")))
+#   data     <- DFs_for_GLMs %>% select(-ID)
+#   
+#   ## Firth’s bias‐reduced model ##
+#   firth_mod <- logistf(formula = f, 
+#                        data = data,
+#                        control = logistf.control(maxit = 500, maxstep =  50),    
+#                        plcontrol = logistf.control(maxit = 500))
+# })
+
+## Safe version ##
+Multi_Models_Firth <- imap(Top_Markers_Clean, ~{
   ## .y is like "AGP_Clinical", .x is the vector of top markers
-  
+  safe_firth <- possibly(logistf, otherwise = NULL)
   ## extract response and build formula
   response <- sub("^[^_]+_(.*)$", "\\1", .y)
   f        <- as.formula(paste0(response, " ~ ", paste(.x, collapse = " + ")))
   data     <- DFs_for_GLMs %>% select(-ID)
   
   ## Firth’s bias‐reduced model ##
-  firth_mod <- logistf(formula = f, 
+  firth_mod <- safe_firth(formula = f, 
                        data = data,
-                       control = logistf.control(maxit = 200, maxstep =  50),    
-                       plcontrol = logistf.control(maxit = 200))
+                       control = logistf.control(maxit = 500, maxstep =  50),    
+                       plcontrol = logistf.control(maxit = 500))
+  if (is.null(firth_mod)) warning("Firth failed for ", .y)
+  firth_mod
 })
-
 
 # Multi_Models_Penalised <- imap(Top_Markers, ~{
 #   ## .y is like "AGP_Clinical", .x is the vector of top markers
@@ -773,18 +820,29 @@ Multi_Results_Firth <- purrr::map_df(Multi_Models_Firth,
 #            OR = exp(cm[-1, 1]))
 #   })
 
+Annotate_these <- Correlations %>% 
+  filter(Variable == "Renal_Impairment" | Variable == "Clinical_Response") %>% 
+  filter(Significance == "*") %>% 
+  pull(Marker)
+
 Multi_Results_Firth_Clean <- Multi_Results_Firth %>% 
   select(Model, 
          Marker = term, 
          estimate, 
          lower = conf.low, 
-         higher = conf.high) %>% 
+         higher = conf.high, 
+         p.value) %>% 
   mutate(Origin = gsub("_.*", "", Model), 
          Model = sub("^[^_]+_", "", Model), 
-         Marker = str_replace_all(Marker, "_", " "), 
+         Marker_Clean = str_replace_all(Marker, "^[^_]+_", ""), 
          OR = exp(estimate), 
          lowerOR = exp(lower), 
-         upperOR = exp(higher))
+         upperOR = exp(higher), 
+         do_annotate = Marker %in% Annotate_these,
+         Marker_label = if_else(do_annotate,
+                                paste0("<span style='color:red; font-weight:bold; font-size:12pt; vertical-align:-10px;'>*</span>\u2002",
+                                       Marker_Clean), 
+                                Marker_Clean)) 
 
 ```
 
@@ -829,7 +887,7 @@ for (i in unique(Multi_Results_Firth_Clean$Origin)) {
                                                  "Long term outcome:\nRenal Impairment")) +
     labs(x = "Odds Ratio (Log10 scale)",
          y = "Predictor",
-         title = paste0("Firth's Penalised GLM, Odds Ratio: ", i)) +
+         title = paste0("Firth's Penalized GLM", i)) +
     scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
     scale_x_continuous(labels = label_scientific(digits = 2)) +
     scale_x_log10() +
@@ -852,7 +910,7 @@ for (i in unique(Multi_Results_Firth_Clean$Origin)) {
                                        rescale.distributions = TRUE) +
     labs(x = "Estimate (Log Odds)",
          y = "Predictor",
-         title = paste0("Firth's Penalised GLM, Estimates: ", i)) +
+         title = paste0("Firth's Penalized GLM", i)) +
     scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
     theme(axis.title.x = element_text(face = "bold"),
           panel.grid.major.y = element_blank(), 
@@ -881,13 +939,14 @@ for (i in unique(Multi_Results_Firth_Clean$Origin)) {
 
 ```
 
-```{r Visualisation manual - Estimates}
+```{r Visualisation manual - Firth - Estimates}
 
 Estimate_Plots <- Multi_Results_Firth_Clean %>%
   group_split(Origin) %>%
   set_names(map_chr(., ~ unique(.x$Origin))) %>%
   imap(function(df, name) {
-    p <- ggplot(df, aes(x = estimate, y = Marker, color = Model)) +
+    p <- ggplot(df, aes(x = estimate, y = Marker_label, color = Model)) +
+      geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
       geom_point(position = position_dodge(0.6), size = 3) +
       geom_errorbarh(aes(xmin = lower, xmax = higher),
                      position = position_dodge(0.6),
@@ -899,13 +958,12 @@ Estimate_Plots <- Multi_Results_Firth_Clean %>%
       scale_color_discrete(name = NULL,
                            labels = c("**Short term outcome:**<br>Clinical Response",
                                       "<br>**Long term outcome:**<br>Renal Impairment")) +
-      
       labs(title = name) +
       theme_minimal() +
       theme(plot.title = element_text(hjust = 0, face = "bold"),
             panel.grid.major.y = element_blank(), 
             axis.title.y = element_blank(),
-            axis.text.y = element_text(face = "bold"),
+            axis.text.y = element_markdown(),
             axis.title.x = element_blank(), 
             axis.ticks.x = element_blank(), 
             legend.text = element_markdown(size = 10))
@@ -929,35 +987,256 @@ Plot_x_axis <- ggplot() +
   theme(axis.title.x = element_text(face = "bold", size = 12),
         plot.margin  = margin(t = 0, r = 0, b = 0, l = 10))
 
-Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
+Firth_Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
                          ncol = 1,
-                         heights = c(sum(heights), 1), 
+                         heights = c(sum(Plot_Heights), 1), 
                          guides  = "collect") +
-  plot_annotation(title = "Firth-Penalized logistic regression results - Estimates",
+  plot_annotation(title = "Firth-Penalized logistic regression results",
                   theme = theme(plot.title.position = "plot",
                                 plot.title = element_text(size = 16, 
                                                           face = "bold", 
                                                           hjust = 0))) &
   theme(legend.position = "right")
 
-ggsave(plot = Final_Estimate_Plot,
-       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_Total.jpeg",
-       height = 12, width = 10, dpi = 300, device = "jpeg")
+# ggsave(plot = Firth_Final_Estimate_Plot,
+#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_Total.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
 
-
+Firth_Final_Estimate_Plot
 ```
 
-```{r Visualisation manual - Odds Ratio}
+```{r Visualisation manual - Firth - Odds Ratio}
 
-Estimate_Plots <- Multi_Results_Firth_Clean %>%
+OR_Plots <- Multi_Results_Firth_Clean %>%
   group_split(Origin) %>%
   set_names(map_chr(., ~ unique(.x$Origin))) %>%
   imap(function(df, name) {
-    p <- ggplot(df, aes(x = OR, y = Marker, color = Model)) +
+    p <- ggplot(df, aes(x = OR, y = Marker_label, color = Model)) +
       geom_point(position = position_dodge(0.6), size = 3) +
       geom_errorbarh(aes(xmin = lowerOR, xmax = upperOR),
                      position = position_dodge(0.6),
                      height = 0.2) +
+      scale_color_discrete(name = NULL,
+                           labels = c("**Short term outcome:**<br>Clinical Response",
+                                      "<br>**Long term outcome:**<br>Renal Impairment")) +
+      scale_x_continuous(labels = scales::label_scientific(digits = 2)) +
+      labs(title = name) +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0, face = "bold"),
+            panel.grid.major.y = element_blank(), 
+            axis.title.y = element_blank(),
+            axis.text.y = element_markdown(),
+            axis.title.x = element_blank(), 
+            axis.ticks.x = element_blank(), 
+            legend.text = element_markdown(size = 10))
+    p
+  })
+
+# 2) compute relative heights so panels scale with marker counts
+Plot_Heights <- map_int(OR_Plots, ~ nrow(Multi_Results_Firth_Clean %>% 
+                                           filter(Origin == unique(.x$data$Origin))))
+
+# — 3) Wrap them in one column, collect the legend, and inject a gap —
+OR_Plots_wrap <- wrap_plots(OR_Plots, 
+                           ncol = 1, 
+                           heights = Plot_Heights, 
+                           guides  = "collect") 
+
+OR_Plots_wrap <- OR_Plots_wrap &
+  scale_x_continuous(labels = scales::label_scientific(digits = 2)) 
+
+# — 4) Create the shared x‐axis label with minimal bottom gap —
+Plot_x_axis <- ggplot() +
+  labs(x = "Odds Ratio") +
+  theme_void() +
+  theme(axis.title.x = element_text(face = "bold", size = 12),
+        plot.margin  = margin(t = 0, r = 0, b = 0, l = 10))
+
+Firth_Final_OR_Plot <- wrap_plots(list(OR_Plots_wrap, Plot_x_axis),
+                         ncol = 1,
+                         heights = c(sum(Plot_Heights), 1), 
+                         guides  = "collect") +
+  plot_annotation(title = "Firth-Penalized logistic regression results",
+                  theme = theme(plot.title.position = "plot",
+                                plot.title = element_text(size = 16, 
+                                                          face = "bold", 
+                                                          hjust = 0))) &
+  theme(legend.position = "right")
+
+# ggsave(plot = Firth_Final_OR_Plot,
+#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
+
+
+OR_Plots_wrap_log10 <- OR_Plots_wrap & 
+  scale_x_log10(labels = scales::label_scientific(digits = 2))
+
+Plot_x_axis_log10 <- ggplot() +
+  labs(x = "Odds Ratio (Log10 scaled)") +
+  theme_void() +
+  theme(axis.title.x = element_text(face = "bold", size = 12),
+        plot.margin  = margin(t = 0, r = 0, b = 0, l = 10))
+
+Firth_Final_log10 <- wrap_plots(list(OR_Plots_wrap_log10, Plot_x_axis_log10),
+                         ncol = 1,
+                         heights = c(sum(Plot_Heights), 1), 
+                         guides  = "collect") &
+  plot_annotation(title = "Firth-Penalized logistic regression results",
+                  theme = theme(plot.title.position = "plot",
+                                plot.title = element_text(size = 16, 
+                                                          face = "bold", 
+                                                          hjust = 0))) &
+  theme(legend.position = "right")
+
+# ggsave(plot = Firth_Final_log10,
+#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total_log10_scale.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
+
+Firth_Final_OR_Plot
+Firth_Final_log10
+```
+
+
+
+```{r Do the same manually for Multi_Results}
+
+Annotate_these <- Correlations %>% 
+  filter(Variable == "Renal_Impairment" | Variable == "Clinical_Response") %>% 
+  filter(Significance == "*") %>% 
+  pull(Marker)
+
+Multi_Results_Clean <- Multi_Results %>% 
+  drop_na() %>% 
+  select(
+    Model, 
+    Marker,       # this is still the full name, e.g. "AGP_IIIORM1N4H5S2"
+    estimate, 
+    std.error,
+    p.value,
+    OR,      
+    lower,    
+    upper     
+  ) %>% 
+  mutate(
+    # compute log‐odds CIs
+    lower_est = estimate - 1.96 * std.error,
+    higher_est = estimate + 1.96 * std.error,
+    
+    # remember origin and strip off prefix for display
+    Origin      = sub("_.*",       "", Model),
+    Model       = sub("^[^_]+_",   "", Model),
+    Marker_Clean = sub("^[^_]+_",  "", Marker),
+    
+    # rename your OR‐scale CIs
+    lowerOR = lower,
+    upperOR = upper,
+    
+    # flag exactly those in your Annotate_these list
+    do_annotate = Marker %in% Annotate_these,
+    Marker_label = if_else(
+      do_annotate,
+      # big star, then thin space, then the cleaned name
+      paste0("<span style='color:red; font-weight:bold; font-size:12pt; vertical-align:-10px;'>*</span>\u2002",
+             Marker_Clean),
+      Marker_Clean)) %>% 
+  select(Origin, Model, Marker = Marker_Clean, Marker_label,
+         estimate, lower_est, higher_est, lowerOR, upperOR, OR, p.value)
+
+
+
+
+
+
+```
+
+```{r Jtools Visualisation -  Normal GLMs Cleaned}
+
+# for (i in unique(Multi_Results_Clean$Origin)) {
+#   
+#   Current_Model_1 <- paste0(i, "_Clinical_Response")
+#   Current_Model_2 <- paste0(i, "_Renal_Impairment")
+#   
+#   # grab the actual model objects
+#   Model_1 <- Multi_Models[[Current_Model_1]]
+#   Model_2 <- Multi_Models[[Current_Model_2]]
+#   
+#   Current_Plot_ORs <- plot_summs(Model_1, 
+#                                  Model_2,
+#                                  exp = TRUE, 
+#                                  model.names = c("Short term outcome:\nClinical Response", 
+#                                                  "Long term outcome:\nRenal Impairment")) +
+#     labs(x = "Odds Ratio (Log10 scale)",
+#          y = "Predictor",
+#          title = paste0("Logistic Regression results:", i)) +
+#     scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
+#     scale_x_continuous(labels = label_scientific(digits = 2)) +
+#     scale_x_log10() +
+#     theme(axis.title.x = element_text(face = "bold"),
+#           panel.grid.major.y = element_blank(), 
+#           axis.text.y = element_text(face = "bold"), 
+#           plot.title.position = "plot",  
+#           plot.title = element_text(hjust = 0), 
+#           legend.title = element_blank(), 
+#           legend.text = element_text(face = "bold", size = 10))
+#   
+#   OR_Plot_Name <- paste0("GLM_", i, "_ORs.jpeg")
+#   
+#   Current_Plot_Estimates <- plot_summs(Model_1, 
+#                                        Model_2,
+#                                        model.names = c("Short term outcome:\nClinical Response", 
+#                                                  "Long term outcome:\nRenal Impairment"),
+#                                        # coefs = good.coefs,
+#                                        plot.distributions = TRUE, 
+#                                        rescale.distributions = TRUE) +
+#     labs(x = "Estimate (Log Odds)",
+#          y = "Predictor",
+#          title = paste0("Firth's Penalized GLM", i)) +
+#     scale_y_discrete(labels = function(txt) gsub("_", " ", txt)) +
+#     theme(axis.title.x = element_text(face = "bold"),
+#           panel.grid.major.y = element_blank(), 
+#           axis.text.y = element_text(face = "bold"), 
+#           plot.title.position = "plot",  
+#           plot.title = element_text(hjust = 0), 
+#           legend.title = element_blank(), 
+#           legend.text = element_text(face = "bold", size = 10))
+#   
+#   Estimates_Plot_Name <- paste0("GLM_", i, "_Estimates.jpeg")
+#   
+#   ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM/ORs/", OR_Plot_Name),
+#          plot = Current_Plot_ORs,
+#          width = 10,
+#          height = 6,
+#          dpi = 300,
+#          device = "jpeg")
+# 
+#   ggsave(filename = paste0("~/SLE/Glycans/Plots/GLM/Estimates/", Estimates_Plot_Name),
+#          plot = Current_Plot_Estimates,
+#          width = 10,
+#          height = 6,
+#          dpi = 300,
+#          device = "jpeg")
+# }
+
+```
+
+```{r Visualisation manual - Estimates}
+
+options(scipen = 999)
+
+Estimate_Plots <- Multi_Results_Clean %>%
+  group_split(Origin) %>%
+  set_names(map_chr(., ~ unique(.x$Origin))) %>%
+  imap(function(df, name) {
+    p <- ggplot(df, aes(x = estimate, y = Marker_label, color = Model)) +
+      geom_vline(xintercept = 0, linetype = "dashed", colour = "black") +
+      geom_point(position = position_dodge(0.6), size = 3) +
+      geom_errorbarh(aes(xmin = lower_est, xmax = higher_est),
+                     position = position_dodge(0.6),
+                     height = 0.2) +
+      # scale_color_discrete(name = NULL,
+      #                      labels = c(expression(atop(bold("Short term outcome:"), "Clinical Response")),
+      #                                 expression(atop(bold("Long term outcome:"), "Renal Impairment"))),
+      #                      guide = guide_legend(label.hjust = 0, ncol = 1, nrow = 2)) +
       scale_color_discrete(name = NULL,
                            labels = c("**Short term outcome:**<br>Clinical Response",
                                       "<br>**Long term outcome:**<br>Renal Impairment")) +
@@ -966,7 +1245,7 @@ Estimate_Plots <- Multi_Results_Firth_Clean %>%
       theme(plot.title = element_text(hjust = 0, face = "bold"),
             panel.grid.major.y = element_blank(), 
             axis.title.y = element_blank(),
-            axis.text.y = element_text(face = "bold"),
+            axis.text.y = element_markdown(),
             axis.title.x = element_blank(), 
             axis.ticks.x = element_blank(), 
             legend.text = element_markdown(size = 10))
@@ -985,44 +1264,120 @@ Estimate_Plots_wrap <- wrap_plots(Estimate_Plots,
 
 # — 4) Create the shared x‐axis label with minimal bottom gap —
 Plot_x_axis <- ggplot() +
+  labs(x = "Estimate (Log-Odds)") +
+  theme_void() +
+  theme(axis.title.x = element_text(face = "bold", size = 12),
+        plot.margin  = margin(t = 0, r = 0, b = 0, l = 10))
+
+GLM_Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
+                         ncol = 1,
+                         heights = c(sum(Plot_Heights), 1), 
+                         guides  = "collect") +
+  plot_annotation(title = "Logistic regression results",
+                  theme = theme(plot.title.position = "plot",
+                                plot.title = element_text(size = 16, 
+                                                          face = "bold", 
+                                                          hjust = 0))) &
+  theme(legend.position = "right")
+
+# ggsave(plot = GLM_Final_Estimate_Plot,
+#        filename = "~/SLE/Glycans/Plots/GLM/Normal_GLM_Estimates_Total.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
+
+GLM_Final_Estimate_Plot
+
+```
+
+```{r Visualisation manual - Odds Ratio}
+
+options(scipen = 999)
+
+OR_Plots <- Multi_Results_Clean %>%
+  group_split(Origin) %>%
+  set_names(map_chr(., ~ unique(.x$Origin))) %>%
+  imap(function(df, name) {
+    p <- ggplot(df, aes(x = OR, y = Marker_label, color = Model)) +
+      geom_point(position = position_dodge(0.6), size = 3) +
+      geom_errorbarh(aes(xmin = lowerOR, xmax = upperOR),
+                     position = position_dodge(0.6),
+                     height = 0.2) +
+      scale_color_discrete(name = NULL,
+                           labels = c("**Short term outcome:**<br>Clinical Response",
+                                      "<br>**Long term outcome:**<br>Renal Impairment")) +
+      scale_x_continuous(labels = scales::label_scientific(digits = 2)) +
+      labs(title = name) +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0, face = "bold"),
+            panel.grid.major.y = element_blank(), 
+            axis.title.y = element_blank(),
+            axis.text.y = element_markdown(),
+            axis.title.x = element_blank(), 
+            axis.ticks.x = element_blank(), 
+            legend.text = element_markdown(size = 10))
+    p
+  })
+
+# 2) compute relative heights so panels scale with marker counts
+Plot_Heights <- map_int(OR_Plots, ~ nrow(Multi_Results_Clean %>% 
+                                           filter(Origin == unique(.x$data$Origin))))
+
+# — 3) Wrap them in one column, collect the legend, and inject a gap —
+OR_Plots_wrap <- wrap_plots(OR_Plots, 
+                           ncol = 1, 
+                           heights = Plot_Heights, 
+                           guides  = "collect") 
+
+OR_Plots_wrap <- OR_Plots_wrap &
+  scale_x_continuous(labels = scales::label_scientific(digits = 2)) 
+
+# — 4) Create the shared x‐axis label with minimal bottom gap —
+Plot_x_axis <- ggplot() +
+  labs(x = "Odds Ratio") +
+  theme_void() +
+  theme(axis.title.x = element_text(face = "bold", size = 12),
+        plot.margin  = margin(t = 0, r = 0, b = 0, l = 10))
+
+GLM_Final_OR_Plot <- wrap_plots(list(OR_Plots_wrap, Plot_x_axis),
+                         ncol = 1,
+                         heights = c(sum(Plot_Heights), 1), 
+                         guides  = "collect") +
+  plot_annotation(title = "Logistic regression results",
+                  theme = theme(plot.title.position = "plot",
+                                plot.title = element_text(size = 16, 
+                                                          face = "bold", 
+                                                          hjust = 0))) &
+  theme(legend.position = "right")
+
+# ggsave(plot = GLM_Final_OR_Plot,
+#        filename = "~/SLE/Glycans/Plots/GLM/Normal_GLM_ORs_Total.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
+
+
+OR_Plots_wrap_log10 <- OR_Plots_wrap & 
+  scale_x_log10(labels = scales::label_scientific(digits = 2))
+
+Plot_x_axis_log10 <- ggplot() +
   labs(x = "Odds Ratio (Log10 scaled)") +
   theme_void() +
   theme(axis.title.x = element_text(face = "bold", size = 12),
         plot.margin  = margin(t = 0, r = 0, b = 0, l = 10))
 
-Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
+GLM_Final_log10 <- wrap_plots(list(OR_Plots_wrap_log10, Plot_x_axis_log10),
                          ncol = 1,
-                         heights = c(sum(heights), 1), 
+                         heights = c(sum(Plot_Heights), 1), 
                          guides  = "collect") +
-  plot_annotation(title = "Firth-Penalized logistic regression results - Odds Ratio",
+  plot_annotation(title = "Logistic regression results - Odds Ratio",
                   theme = theme(plot.title.position = "plot",
                                 plot.title = element_text(size = 16, 
                                                           face = "bold", 
                                                           hjust = 0))) &
   theme(legend.position = "right")
 
-ggsave(plot = Final_Estimate_Plot,
-       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total.jpeg",
-       height = 12, width = 10, dpi = 300, device = "jpeg")
+# ggsave(plot = GLM_Final_log10,
+#        filename = "~/SLE/Glycans/Plots/GLM/Normal_GLM_ORs_Total_log10_scale.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
 
-
-Estimate_Plots_log10 <- Estimate_Plots_wrap & 
-  scale_x_log10()
-
-Final_log10 <- wrap_plots(list(Estimate_Plots_log10, Plot_x_axis),
-                         ncol = 1,
-                         heights = c(sum(heights), 1), 
-                         guides  = "collect") +
-  plot_annotation(title = "Firth-Penalized logistic regression results - Odds Ratio",
-                  theme = theme(plot.title.position = "plot",
-                                plot.title = element_text(size = 16, 
-                                                          face = "bold", 
-                                                          hjust = 0))) &
-  theme(legend.position = "right")
-
-ggsave(plot = Final_log10,
-       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total_log10_scale.jpeg",
-       height = 12, width = 10, dpi = 300, device = "jpeg")
-
+GLM_Final_OR_Plot
+GLM_Final_log10
 
 ```
