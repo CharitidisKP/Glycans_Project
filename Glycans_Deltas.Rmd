@@ -1064,9 +1064,9 @@ Firth_Final_OR_Plot <- wrap_plots(list(OR_Plots_wrap, Plot_x_axis),
                                                           hjust = 0))) &
   theme(legend.position = "right")
 
-ggsave(plot = Firth_Final_OR_Plot,
-       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total.jpeg",
-       height = 18, width = 10, dpi = 300, device = "jpeg")
+# ggsave(plot = Firth_Final_OR_Plot,
+#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
 
 
 OR_Plots_wrap_log10 <- OR_Plots_wrap & 
@@ -1089,9 +1089,9 @@ Firth_Final_log10 <- wrap_plots(list(OR_Plots_wrap_log10, Plot_x_axis_log10),
                                                           hjust = 0))) &
   theme(legend.position = "right")
 
-ggsave(plot = Firth_Final_log10,
-       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total_log10_scale.jpeg",
-       height = 18, width = 10, dpi = 300, device = "jpeg")
+# ggsave(plot = Firth_Final_log10,
+#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_ORs_Total_log10_scale.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
 
 Firth_Final_OR_Plot
 Firth_Final_log10
@@ -1221,7 +1221,7 @@ Multi_Results_Clean <- Multi_Results %>%
 
 ```{r Visualisation manual - Estimates}
 
-options(scipen = 999)
+# options(scipen = 999)
 
 Estimate_Plots <- Multi_Results_Clean %>%
   group_split(Origin) %>%
@@ -1281,7 +1281,7 @@ GLM_Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
   theme(legend.position = "right")
 
 # ggsave(plot = GLM_Final_Estimate_Plot,
-#        filename = "~/SLE/Glycans/Plots/GLM/Normal_GLM_Estimates_Total.jpeg",
+#        filename = "~/SLE/Glycans/Plots/GLM/Normal_GLM_Estimates_Total_2.jpeg",
 #        height = 18, width = 10, dpi = 300, device = "jpeg")
 
 GLM_Final_Estimate_Plot
