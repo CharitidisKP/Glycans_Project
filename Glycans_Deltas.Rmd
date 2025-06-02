@@ -47,7 +47,7 @@ Glycan_Outcomes <- read_xlsx("~/SLE/Glycans/Data/Glycans_Outcomes.xlsx")
 
 ```{r Prep slightly}
 
-Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "extra-renal", "Renal Impairment", "Clinical")
+Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "total", "extra-renal", "Renal Impairment", "Clinical")
 
 Comparator_Values <- Increased_data %>%
   rename(ID = `Patient number`, Time_point = `Time point`) %>%
@@ -55,7 +55,8 @@ Comparator_Values <- Increased_data %>%
   rename(Renal_Impairment = `Renal Impairment`,
          Extra_Renal = `extra-renal`,
          S_creatinine = `S-creatinine`, 
-         Clinical_Response = Clinical) %>%
+         Clinical_Response = Clinical, 
+         SLEDAI = total) %>%
   mutate(Identification = paste0(ID, " ", Time_point)) %>%
   select(-c(ID, Time_point)) %>%
   select(Identification, everything()) %>%
@@ -216,6 +217,21 @@ Correlations <- expand_grid(Marker = colnames(Dataframes_Final_Sign_Wide),
   rename(Correlation = "rho") %>% 
   mutate(Significance = case_when(p.value < 0.05 ~ "*"))
 
+Variables_Rename <- c(AI = "AI",
+                      CI = "CI",
+                      S_creatinine = "Creatinine",
+                      eGFR = "eGFR",
+                      UPCR = "UPCR",
+                      albumin = "Albumin",
+                      SLEDAI = "SLEDAI",
+                      Extra_Renal = "Extra-renal SLEDAI",
+                      Renal_Impairment = "Renal_Impairment", 
+                      Clinical_Response = "Clinical_Response")
+
+Correlations <- Correlations %>% 
+  mutate(Variable = recode(Variable, !!!Variables_Rename),
+         Variable = factor(Variable, levels = Variables_Rename))
+
 
 ```
 
@@ -233,7 +249,7 @@ Main_plot <- ggplot(Correlations, aes(x = Variable, y = Marker, fill = Correlati
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
-    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Extra-renal SLEDAI", "Extra-renal<br>SLEDAI", x)
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x <- gsub("Clinical Response", "Clinical<br>Response", x)
     x }, expand = c(0,0)) +
@@ -303,7 +319,8 @@ Comparator_Values_Delta <- Increased_data %>%
          Extra_Renal = `extra-renal`,
          S_creatinine = `S-creatinine`, 
          Clinical_Response = Clinical, 
-         Albumin = albumin) %>%
+         Albumin = albumin, 
+         SLEDAI = total) %>%
   mutate(AI = as.numeric(AI),
          CI = as.numeric(CI)) %>% 
   pivot_longer(cols = -c(ID, Time_point), 
@@ -336,6 +353,10 @@ Correlations_Delta <- expand_grid(Marker = colnames(Dataframes_Delta),
   inner_join(Directions, by = c("Marker", "Origin")) %>% 
   rename(Correlation = "rho") %>% 
   mutate(Significance = case_when(p.value < 0.05 ~ "*"))
+         
+Correlations_Delta <- Correlations_Delta %>% 
+  mutate(Variable = recode(Variable, !!!Variables_Rename),
+         Variable = factor(Variable, levels = Variables_Rename))
 
 
 ```
@@ -364,7 +385,7 @@ Main_plot_Delta <- ggplot(Correlations_Delta, aes(x = Variable, y = Marker, fill
                    expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
-    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Extra-renal SLEDAI", "Extra-renal<br>SLEDAI", x)
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x <- gsub("Clinical Response", "Clinical<br>Response", x)
     x <- gsub("albumin", "Albumin", x)
@@ -430,7 +451,7 @@ Combined_Delta <- Main_plot_Delta + Dir_plot_Delta +
 
 # ggsave(plot = Combined_Delta,
 #        filename = "~/SLE/Glycans/Plots/Glycans_Correlations_Delta_final.jpeg",
-#        width = 10, height = 24, dpi = 300)
+#        width = 12, height = 24, dpi = 300)
 
 ```
 
@@ -451,10 +472,11 @@ Comparator_Values_Delta_2 <- Increased_data %>%
   rename(ID = `Patient number`, Time_point = `Time point`) %>%
   select(ID, Time_point, any_of(Comparators)) %>%
   rename(Renal_Impairment = `Renal Impairment`,
-         Extra_Renal = `extra-renal`,
-         S_creatinine = `S-creatinine`, 
+         Extra_renal_SLEDAI = `extra-renal`,
+         Creatinine = `S-creatinine`, 
          Clinical_Response = Clinical, 
-         Albumin = albumin) %>%
+         Albumin = albumin, 
+         SLEDAI = total) %>%
   mutate(AI = as.numeric(AI),
          CI = as.numeric(CI)) 
 
@@ -943,7 +965,8 @@ for (i in unique(Multi_Results_Firth_Clean$Origin)) {
 ```{r Visualisation manual - Firth - Estimates}
 
 Estimate_Plots <- Multi_Results_Firth_Clean %>%
-  group_split(Origin) %>%
+  mutate(Origin_2 = factor(Origin, levels = c("Fab", "Serum", "AGP", "Fc", "IgG", "C3"))) %>% 
+  group_split(Origin_2) %>%
   set_names(map_chr(., ~ unique(.x$Origin))) %>%
   imap(function(df, name) {
     p <- ggplot(df, aes(x = estimate, y = Marker_label, color = Model)) +
@@ -956,9 +979,12 @@ Estimate_Plots <- Multi_Results_Firth_Clean %>%
       #                      labels = c(expression(atop(bold("Short term outcome:"), "Clinical Response")),
       #                                 expression(atop(bold("Long term outcome:"), "Renal Impairment"))),
       #                      guide = guide_legend(label.hjust = 0, ncol = 1, nrow = 2)) +
+      # scale_color_discrete(name = NULL,
+      #                      labels = c("**Short term outcome:**<br>Clinical Response",
+      #                                 "<br>**Long term outcome:**<br>Renal Impairment")) +
       scale_color_discrete(name = NULL,
                            labels = c("**Short term outcome:**<br>Clinical Response",
-                                      "<br>**Long term outcome:**<br>Renal Impairment")) +
+                                      "**Long term outcome:**<br>Renal Impairment")) +      
       labs(title = name) +
       theme_minimal() +
       theme(plot.title = element_text(hjust = 0, face = "bold"),
@@ -999,9 +1025,9 @@ Firth_Final_Estimate_Plot <- wrap_plots(list(Estimate_Plots_wrap, Plot_x_axis),
                                                           hjust = 0))) &
   theme(legend.position = "right")
 
-ggsave(plot = Firth_Final_Estimate_Plot,
-       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_Total.jpeg",
-       height = 18, width = 10, dpi = 300, device = "jpeg")
+# ggsave(plot = Firth_Final_Estimate_Plot,
+#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_Total.jpeg",
+#        height = 18, width = 10, dpi = 300, device = "jpeg")
 
 Firth_Final_Estimate_Plot
 ```
@@ -1009,7 +1035,8 @@ Firth_Final_Estimate_Plot
 ```{r Visualisation manual - Firth - Odds Ratio}
 
 OR_Plots <- Multi_Results_Firth_Clean %>%
-  group_split(Origin) %>%
+  mutate(Origin_2 = factor(Origin, levels = c("Fab", "Serum", "AGP", "Fc", "IgG", "C3"))) %>% 
+  group_split(Origin_2) %>%
   set_names(map_chr(., ~ unique(.x$Origin))) %>%
   imap(function(df, name) {
     p <- ggplot(df, aes(x = OR, y = Marker_label, color = Model)) +
@@ -1017,9 +1044,12 @@ OR_Plots <- Multi_Results_Firth_Clean %>%
       geom_errorbarh(aes(xmin = lowerOR, xmax = upperOR),
                      position = position_dodge(0.6),
                      height = 0.2) +
+      # scale_color_discrete(name = NULL,
+      #                      labels = c("**Short term outcome:**<br>Clinical Response",
+      #                                 "<br>**Long term outcome:**<br>Renal Impairment")) +
       scale_color_discrete(name = NULL,
                            labels = c("**Short term outcome:**<br>Clinical Response",
-                                      "<br>**Long term outcome:**<br>Renal Impairment")) +
+                                      "**Long term outcome:**<br>Renal Impairment")) +
       scale_x_continuous(labels = scales::label_scientific(digits = 2)) +
       labs(title = name) +
       theme_minimal() +
@@ -1379,5 +1409,114 @@ GLM_Final_log10 <- wrap_plots(list(OR_Plots_wrap_log10, Plot_x_axis_log10),
 
 GLM_Final_OR_Plot
 GLM_Final_log10
+
+```
+
+```{r Firth - Estimates - Horizontal}
+
+Firth_Estimate_Grid_H <- wrap_plots(Estimate_Plots,
+                                  ncol = 3,
+                                  nrow = 2,         
+                                  guides = "collect")   +
+  plot_annotation(title = "Firth-Penalized Logistic Regression\nEstimates (Log Odds)", 
+                  theme = theme(plot.title.position = "plot",
+                  plot.title = element_text(face = "bold",
+                                            size = 16, 
+                                            hjust = 0))) &
+  theme(legend.position = "bottom", 
+        legend.justification = c("center", "bottom"),        
+        legend.box = "horizontal",      
+        legend.direction = "horizontal", 
+        plot.margin = margin(t = 5, r = 20, b = 5, l = 5))
+
+ggsave(Firth_Estimate_Grid_H,
+       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_2x3.jpeg",
+       width = 14, height = 10, dpi = 300)
+
+Firth_Estimate_Grid_H
+
+```
+
+```{r Firth - Estimates - Vertical}
+
+Plot_x_label_Est <- ggplot() +
+  labs(x = "Estimates (Log Odds)") +
+  theme_void() +
+  theme(axis.title.x  = element_text(face = "bold", size = 12),
+        plot.margin   = margin(t = 0, r = 0, b = 0, l = 10))
+
+Firth_Estimate_Grid_V <- wrap_plots(
+  wrap_plots(Estimate_Plots, ncol = 3, nrow = 2, guides = "collect"),
+  Plot_x_label_Est,
+  ncol = 1,
+  heights = c(10, 1),    
+  guides = "collect") +
+  plot_annotation(title = "Firth-Penalized Logistic Regression", 
+                  theme = theme(plot.title.position = "plot",
+                  plot.title = element_text(face = "bold",
+                                            size = 16, 
+                                            hjust = 0))) &
+  theme(legend.position = "right")
+
+ggsave(Firth_Estimate_Grid_V,
+  filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_3x2.jpeg",
+  width = 14, height = 10, dpi = 300)
+
+Firth_Estimate_Grid_V
+
+```
+
+```{r}
+
+Firth_OR_Grid_H <- wrap_plots(OR_Plots,
+                                  ncol = 3,
+                                  nrow = 2,         
+                                  guides = "collect")   +
+  plot_annotation(title = "Firth-Penalized Logistic Regression\nOdds Ratio", 
+                  theme = theme(plot.title.position = "plot",
+                  plot.title = element_text(face = "bold",
+                                            size = 16, 
+                                            hjust = 0))) &
+  theme(legend.position = "bottom", 
+        legend.justification = c("center", "bottom"),        
+        legend.box = "horizontal",      
+        legend.direction = "horizontal", 
+        plot.margin = margin(t = 5, r = 20, b = 5, l = 5))
+
+ggsave(Firth_OR_Grid_H,
+  filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_OR_2x3.jpeg",
+  width = 14, height = 10, dpi = 300)
+
+Firth_OR_Grid_H
+
+```
+
+
+```{r}
+
+Plot_x_label_OR <- ggplot() +
+  labs(x = "Odds Ratio") +
+  theme_void() +
+  theme(axis.title.x  = element_text(face = "bold", size = 12),
+        plot.margin   = margin(t = 0, r = 0, b = 0, l = 10))
+
+Firth_OR_Grid_V <- wrap_plots(
+  wrap_plots(OR_Plots, ncol = 2, nrow = 3, guides = "collect"),
+  Plot_x_label_OR,
+  ncol = 1,
+  heights = c(10, 1),    
+  guides = "collect") +
+  plot_annotation(title = "Firth-Penalized Logistic Regression", 
+                  theme = theme(plot.title.position = "plot",
+                  plot.title = element_text(face = "bold",
+                                            size = 16, 
+                                            hjust = 0))) &
+  theme(legend.position = "right")
+
+ggsave(Firth_OR_Grid_V,
+  filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_OR_3x2.jpeg",
+  width = 14, height = 10, dpi = 300)
+
+Firth_OR_Grid_V
 
 ```
