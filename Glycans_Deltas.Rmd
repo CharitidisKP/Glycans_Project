@@ -136,6 +136,15 @@ Test_Results <- bind_rows(Test_Results, .id = "Origin")
 
 ```
 
+```{r}
+
+Test_Results %>% 
+  mutate(P_adjusted = p.adjust(p.value, method = "BH")) %>% 
+  filter(p.value < 0.05)
+
+```
+
+
 ```{r Perform the paired t tests}
 
 Paired_t_Tests <- function(df){ df %>% 
@@ -1429,9 +1438,9 @@ Firth_Estimate_Grid_H <- wrap_plots(Estimate_Plots,
         legend.direction = "horizontal", 
         plot.margin = margin(t = 5, r = 20, b = 5, l = 5))
 
-ggsave(Firth_Estimate_Grid_H,
-       filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_2x3.jpeg",
-       width = 14, height = 10, dpi = 300)
+# ggsave(Firth_Estimate_Grid_H,
+#        filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_2x3.jpeg",
+#        width = 14, height = 10, dpi = 300)
 
 Firth_Estimate_Grid_H
 
@@ -1458,9 +1467,9 @@ Firth_Estimate_Grid_V <- wrap_plots(
                                             hjust = 0))) &
   theme(legend.position = "right")
 
-ggsave(Firth_Estimate_Grid_V,
-  filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_3x2.jpeg",
-  width = 14, height = 10, dpi = 300)
+# ggsave(Firth_Estimate_Grid_V,
+#   filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_Estimates_3x2.jpeg",
+#   width = 14, height = 10, dpi = 300)
 
 Firth_Estimate_Grid_V
 
@@ -1483,9 +1492,9 @@ Firth_OR_Grid_H <- wrap_plots(OR_Plots,
         legend.direction = "horizontal", 
         plot.margin = margin(t = 5, r = 20, b = 5, l = 5))
 
-ggsave(Firth_OR_Grid_H,
-  filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_OR_2x3.jpeg",
-  width = 14, height = 10, dpi = 300)
+# ggsave(Firth_OR_Grid_H,
+#   filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_OR_2x3.jpeg",
+#   width = 14, height = 10, dpi = 300)
 
 Firth_OR_Grid_H
 
@@ -1513,9 +1522,9 @@ Firth_OR_Grid_V <- wrap_plots(
                                             hjust = 0))) &
   theme(legend.position = "right")
 
-ggsave(Firth_OR_Grid_V,
-  filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_OR_3x2.jpeg",
-  width = 14, height = 10, dpi = 300)
+# ggsave(Firth_OR_Grid_V,
+#   filename = "~/SLE/Glycans/Plots/Firth_GLM_Delta/Firth_OR_3x2.jpeg",
+#   width = 14, height = 10, dpi = 300)
 
 Firth_OR_Grid_V
 
