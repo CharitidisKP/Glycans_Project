@@ -139,7 +139,7 @@ Test_Results <- bind_rows(Test_Results, .id = "Origin")
 ```{r}
 
 Test_Results %>% 
-  mutate(P_adjusted = p.adjust(p.value, method = "BH")) %>% 
+  mutate(P_adjusted = p.adjust(p.value, method = "fdr")) %>% 
   filter(p.value < 0.05)
 
 ```

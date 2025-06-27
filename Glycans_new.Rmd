@@ -3,3 +3,190 @@ title: "Glycans_new"
 output: html_document
 ---
 
+```{r Libraries, }
+
+## Load the libraries ##
+library(tidyverse)
+library(readxl)
+library(purrr)
+library(broom)
+library(ggtext)
+library(patchwork)
+library(caret)
+library(jtools)
+library(ggplot2)
+library(rlang)
+library(logistf) ## Firth’s logistf() ##
+library(glmnet) ## Penalised regression ##
+library(broom.helpers)
+library(scales)
+library(patchwork)
+library(grid)
+library(scales)
+library(writexl)
+
+```
+
+```{r Load the data}
+
+AGP_Data <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
+C3_Data <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
+Serum_Data <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
+Decreased_data <- read_xlsx("~/SLE/Glycans/Data/decreased.xlsx")
+Increased_data <- read_xlsx("~/SLE/Glycans/Data/increased.xlsx")
+IgG_FAB_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
+IgG_FC_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
+IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
+Glycan_Outcomes <- read_xlsx("~/SLE/Glycans/Data/Glycans_Outcomes.xlsx")
+
+```
+
+
+```{r Prep slightly}
+
+Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "total", "extra-renal", "Renal Impairment", "Clinical")
+
+Comparator_Values <- Increased_data %>%
+  rename(ID = `Patient number`, Time_point = `Time point`) %>%
+  select(ID, Time_point, any_of(Comparators)) %>%
+  rename(Renal_Impairment = `Renal Impairment`,
+         Extra_Renal = `extra-renal`,
+         S_creatinine = `S-creatinine`, 
+         Clinical_Response = Clinical, 
+         SLEDAI = total) %>%
+  mutate(Identification = paste0(ID, " ", Time_point)) %>%
+  select(-c(ID, Time_point)) %>%
+  select(Identification, everything()) %>%
+  column_to_rownames("Identification") %>%
+  mutate(AI = as.numeric(AI),
+         CI = as.numeric(CI))
+
+```
+
+```{r Make dtaaframes long}
+Dataframes <- list(AGP = AGP_Data, 
+                   C3 = C3_Data, 
+                   Serum = Serum_Data,
+                   Fab = IgG_FAB_Data, 
+                   Fc = IgG_FC_Data, 
+                   IgG = IgG_Meta)
+
+Process_DFs <- function(df){
+  df %>% 
+    select(-c(Sample, `ID_St Luc`)) %>% 
+    rename(ID = `Patient number`, Time_point = `Time point`) %>% 
+    mutate(across(.cols = -c(ID, Time_point), .fns  = as.numeric)) %>% 
+    pivot_longer(cols = -c(ID, Time_point), names_to   = "Marker", values_to  = "Value")
+}
+
+Long_Dataframes <- map(Dataframes, Process_DFs)
+```
+
+
+```{r Calculate the log2FC ratios}
+
+FCR_list <- imap(Long_Dataframes, ~ {
+  df <- .x
+  prefix <- .y
+  
+  df %>% 
+    pivot_wider(names_from = Time_point, values_from = Value) %>% 
+    group_by(Marker) %>% 
+    summarise(mean_T0 = mean(T0, na.rm = TRUE), 
+              mean_T12 = mean(T12, na.rm = TRUE)) %>%  
+    mutate(log2FC = log2(mean_T12/mean_T0), 
+           Marker = paste0(prefix, "_", Marker),
+           Origin = prefix) %>% 
+    select(Origin, Marker, everything())
+})
+
+FCR_Values <- bind_rows(FCR_list)
+
+```
+
+
+
+
+
+
+
+
+
+
+```{r Get the direction of each marker}
+
+Directions_List <- imap(Long_Dataframes, ~ {
+  df <- .x
+  prefix <- .y
+  
+  df %>% 
+    mutate(Marker_Timepoint = paste0(Marker, Time_point)) %>%
+    group_by(Marker_Timepoint) %>%
+    summarise(Mean = mean(Value, na.rm = TRUE), .groups = "drop") %>%
+    extract(col = Marker_Timepoint, 
+          into = c("Marker", "Timepoint"), 
+          regex = "(.+)(T0|T12)$") %>% 
+    pivot_wider(names_from = "Timepoint", values_from = "Mean") %>% 
+    mutate(Direction = case_when(T12 > T0 ~ "Increase", 
+                                 T12 < T0 ~ "Decrease", 
+                                 TRUE ~ NA), 
+           Marker = paste0(prefix, "_", Marker),
+           Origin = prefix) %>% 
+    select(Marker, Direction, Origin)
+})
+
+Directions <- bind_rows(Directions_List)
+
+```
+
+```{r Perform the tests}
+
+Paired_Tests <- function(df){ df %>% 
+  pivot_wider(names_from = "Time_point", values_from = "Value", names_prefix = "Value_") %>% 
+  group_by(Marker) %>% 
+  summarise(Pairs = n_distinct(ID),
+            Test = list(wilcox.test(Value_T12, 
+                                    Value_T0, 
+                                    paired = TRUE, 
+                                    exact = FALSE)), 
+                        .groups = "drop") %>% 
+  mutate(Results = map(Test, broom::tidy)) %>% 
+  unnest(Results) %>% 
+  select(Marker, Pairs, statistic, p.value, method) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr"))
+}
+
+Test_Results <- imap(Long_Dataframes, ~Paired_Tests(.x) %>% 
+                       mutate(Marker = paste0(.y, "_", Marker)))
+
+Test_Results <- bind_rows(Test_Results, .id = "Origin")
+
+```
+
+```{r Prep for the volcanos}
+
+FCR_Values %>% 
+  inner_join(Test_Results %>% select(Marker, p.value, FDR), by = "Marker") %>% 
+  mutate(p_value_log10 = -log10(p.value), 
+         Significance = if_else(p.value < 0.05, "Significant", "Not Significant")) %>% 
+  ggplot(., aes(x = log2FC, y = p_value_log10)) +
+    geom_point(aes(color = Origin, alpha = Significance), size = 1) +
+    scale_alpha_manual(values = c("Significant" = 1.0, 
+                                  "Not Significant" = 0.3), 
+                                  guide = "none") +
+      scale_x_continuous(limits = c(-1, 1), 
+                     breaks = seq(-1, 1, by = 0.5), 
+                     expand = c(0, 0)) +
+    labs(title = "Glycans expression change over a 12 month period", 
+         x = "Fold Change (log2FC)", 
+         y = "P value (-log10)", 
+         colour = "Significance") + 
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
+    geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
+    theme_minimal(base_size = 14) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+          legend.title = element_blank())
+
+
+```
+
