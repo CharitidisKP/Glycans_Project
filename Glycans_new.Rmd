@@ -185,7 +185,9 @@ Top_Glycans_FDR <- FCR_Values %>%
   arrange(FDR) %>% 
   head(25)
 
-FCR_Values %>% filter(FDR < 0.05) %>% nrow()
+y_breaks_nadj <- pretty(range(FCR_Values$p_value_log10), n = 3)
+y_breaks_FDR <- pretty(range(FCR_Values$FDR_log10), n = 3)
+
 
 ```
 
@@ -198,28 +200,31 @@ Volcano_nadj <- ggplot(FCR_Values, aes(x = log2FC, y = p_value_log10)) +
                                   "Not Significant" = 0.3), 
                                   guide = "none") +
   scale_colour_manual(values = Pallete) +
-      scale_x_continuous(limits = c(-1, 1), 
+  scale_x_continuous(limits = c(-1, 1), 
                      breaks = seq(-1, 1, by = 0.5), 
                      expand = c(0, 0)) +
-    labs(title = "Glycan expression change over a 12 month period", 
+  scale_y_continuous(limits = c(min(y_breaks_nadj), max(y_breaks_nadj)), 
+                     breaks = y_breaks_nadj, 
+                     expand = c(0, 0)) +  
+  labs(title = "Glycan expression change over a 12 month period", 
          x = "Fold Change (log2FC)", 
          y = "P value (-log10)", 
-         caption = paste0("P value: <b>FDR adjusted</b>
-         <br>Number of significant markers:<b>", 
+         caption = paste0("P value: <b>Not adjusted</b>
+         <br>Number of significant markers: <b>", 
          FCR_Values %>% 
            filter(p.value < 0.05) %>% 
            nrow(), "</b></br>")) + 
-    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
-    geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
-    theme_minimal(base_size = 14) +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
-          legend.title = element_blank(), 
-          axis.title.x = element_text(face = "bold"), 
-          axis.title.y = element_text(face = "bold"), 
-          plot.caption.position = "plot", 
-          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
-          panel.grid.major = element_line(color = "grey90"),
-          panel.grid.minor = element_blank()) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+        legend.title = element_blank(), 
+        axis.title.x = element_text(face = "bold"), 
+        axis.title.y = element_text(face = "bold"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+        panel.grid.major = element_line(color = "grey90"),
+        panel.grid.minor = element_blank()) +
   geom_text_repel(data = Top_Glycans_nadj, aes(label = Marker), 
                   size = 3, 
                   force = 2,
@@ -236,14 +241,17 @@ Volcano_FDR <- ggplot(FCR_Values, aes(x = log2FC, y = FDR_log10)) +
                                   "Not Significant" = 0.3), 
                                   guide = "none") +
   scale_colour_manual(values = Pallete) +
-      scale_x_continuous(limits = c(-1, 1), 
+  scale_x_continuous(limits = c(-1, 1), 
                      breaks = seq(-1, 1, by = 0.5), 
                      expand = c(0, 0)) +
+  scale_y_continuous(limits = c(min(y_breaks_FDR), max(y_breaks_FDR)), 
+                     breaks = y_breaks_FDR, 
+                     expand = c(0, 0)) +  
     labs(title = "Glycan expression change over a 12 month period", 
          x = "Fold Change (log2FC)", 
          y = "P value (-log10)", 
          caption = paste0("P value: <b>FDR adjusted</b>
-         <br>Number of significant markers:<b>", 
+         <br>Number of significant markers: <b>", 
          FCR_Values %>% 
            filter(FDR < 0.05) %>% 
            nrow(), "</b></br>")) + 
