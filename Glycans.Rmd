@@ -72,8 +72,8 @@ Process_DFs <- function(df){
   df %>% 
     select(-c(Sample, `ID_St Luc`)) %>% 
     rename(ID = `Patient number`, Time_point = `Time point`) %>% 
-    mutate(across(.cols = -c(ID, Time_point), .fns  = as.numeric)) %>% 
-    pivot_longer(cols = -c(ID, Time_point), names_to   = "Marker", values_to  = "Value")
+    mutate(across(.cols = -c(ID, Time_point), .fns = as.numeric)) %>% 
+    pivot_longer(cols = -c(ID, Time_point), names_to = "Marker", values_to  = "Value")
 }
 
 Long_Dataframes <- map(Dataframes, Process_DFs)
