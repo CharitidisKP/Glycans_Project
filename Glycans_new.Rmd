@@ -24,6 +24,11 @@ library(patchwork)
 library(grid)
 library(scales)
 library(writexl)
+library(RColorBrewer)
+library(ggrepel)
+
+Pallete <- c("coral1", "deeppink3", "midnightblue", "cyan3", "mediumspringgreen", "yellow3")
+
 
 ```
 
@@ -165,27 +170,108 @@ Test_Results <- bind_rows(Test_Results, .id = "Origin")
 
 ```{r Prep for the volcanos}
 
-FCR_Values %>% 
+FCR_Values <- FCR_Values %>% 
   inner_join(Test_Results %>% select(Marker, p.value, FDR), by = "Marker") %>% 
   mutate(p_value_log10 = -log10(p.value), 
-         Significance = if_else(p.value < 0.05, "Significant", "Not Significant")) %>% 
-  ggplot(., aes(x = log2FC, y = p_value_log10)) +
-    geom_point(aes(color = Origin, alpha = Significance), size = 1) +
+         FDR_log10 = -log10(FDR), 
+         Significance = if_else(p.value < 0.05, "Significant", "Not Significant"), 
+         Significance_FDR = if_else(FDR < 0.05, "Significant", "Not Significant"))  
+
+Top_Glycans_nadj <- FCR_Values %>%
+  arrange(p.value) %>% 
+  head(25)
+
+Top_Glycans_FDR <- FCR_Values %>%
+  arrange(FDR) %>% 
+  head(25)
+
+FCR_Values %>% filter(FDR < 0.05) %>% nrow()
+
+```
+
+
+```{r Volcano visualisation}
+
+Volcano_nadj <- ggplot(FCR_Values, aes(x = log2FC, y = p_value_log10)) +
+    geom_point(aes(color = Origin, alpha = Significance), size = 2) +
     scale_alpha_manual(values = c("Significant" = 1.0, 
                                   "Not Significant" = 0.3), 
                                   guide = "none") +
+  scale_colour_manual(values = Pallete) +
       scale_x_continuous(limits = c(-1, 1), 
                      breaks = seq(-1, 1, by = 0.5), 
                      expand = c(0, 0)) +
-    labs(title = "Glycans expression change over a 12 month period", 
+    labs(title = "Glycan expression change over a 12 month period", 
          x = "Fold Change (log2FC)", 
          y = "P value (-log10)", 
-         colour = "Significance") + 
+         caption = paste0("P value: <b>FDR adjusted</b>
+         <br>Number of significant markers:<b>", 
+         FCR_Values %>% 
+           filter(p.value < 0.05) %>% 
+           nrow(), "</b></br>")) + 
     geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
     geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
     theme_minimal(base_size = 14) +
     theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
-          legend.title = element_blank())
+          legend.title = element_blank(), 
+          axis.title.x = element_text(face = "bold"), 
+          axis.title.y = element_text(face = "bold"), 
+          plot.caption.position = "plot", 
+          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+          panel.grid.major = element_line(color = "grey90"),
+          panel.grid.minor = element_blank()) +
+  geom_text_repel(data = Top_Glycans_nadj, aes(label = Marker), 
+                  size = 3, 
+                  force = 2,
+                  box.padding = 0.6, 
+                  point.padding = 0.1, 
+                  segment.color = "black", 
+                  max.overlaps = Inf, 
+                  min.segment.length = 0)
+
+
+Volcano_FDR <- ggplot(FCR_Values, aes(x = log2FC, y = FDR_log10)) +
+    geom_point(aes(color = Origin, alpha = Significance_FDR), size = 2) +
+    scale_alpha_manual(values = c("Significant" = 1.0, 
+                                  "Not Significant" = 0.3), 
+                                  guide = "none") +
+  scale_colour_manual(values = Pallete) +
+      scale_x_continuous(limits = c(-1, 1), 
+                     breaks = seq(-1, 1, by = 0.5), 
+                     expand = c(0, 0)) +
+    labs(title = "Glycan expression change over a 12 month period", 
+         x = "Fold Change (log2FC)", 
+         y = "P value (-log10)", 
+         caption = paste0("P value: <b>FDR adjusted</b>
+         <br>Number of significant markers:<b>", 
+         FCR_Values %>% 
+           filter(FDR < 0.05) %>% 
+           nrow(), "</b></br>")) + 
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
+    geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
+    theme_minimal(base_size = 14) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+          legend.title = element_blank(), 
+          axis.title.x = element_text(face = "bold"), 
+          axis.title.y = element_text(face = "bold"), 
+          plot.caption.position = "plot", 
+          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+          panel.grid.major = element_line(color = "grey90"),
+          panel.grid.minor = element_blank()) +
+  geom_text_repel(data = Top_Glycans_FDR, aes(label = Marker), 
+                  size = 3, 
+                  force = 2,
+                  box.padding = 0.6, 
+                  point.padding = 0.1, 
+                  segment.color = "black", 
+                  max.overlaps = Inf, 
+                  min.segment.length = 0)
+
+ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_nadj.jpeg"),
+       plot = Volcano_nadj, width = 10, height = 8, dpi = 300, device = "jpeg")
+
+ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR.jpeg"),
+       plot = Volcano_FDR, width = 10, height = 8, dpi = 300, device = "jpeg")
 
 
 ```
