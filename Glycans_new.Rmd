@@ -397,8 +397,11 @@ Correlation_Results_Clean <-  Correlation_Results_Total %>%
   group_by(Comparison) %>% 
   mutate(FDR = p.adjust(p.value, method = "fdr"), 
          Significance = case_when(p.value < 0.05 ~ "*"), 
-         Origin = sub("_.*$", "", Marker)) %>% 
+         Origin = sub("_.*$", "", Marker), 
+         Comparator = factor(Comparator, levels = c("AI", "CI", "eGFR", "UPCR", "SLEDAI2K")), 
+         Comparison = factor(Comparison, levels = c("Baseline vs Baseline", "Month 12 vs Month 12", "Baseline vs Month 12"))) %>% 
   rename(Correlation = "estimate")
+  
 
 ```
 
