@@ -218,8 +218,8 @@ Volcano_nadj <- ggplot(FCR_Values, aes(x = log2FC, y = p_value_log10)) +
                      breaks = y_breaks_nadj, 
                      expand = c(0, 0)) +  
   labs(title = "Glycan expression change over a 12 month period", 
-         x = "Fold Change (log2FC)", 
-         y = "P value (-log10)", 
+         x = "Fold Change (log<sub>2</sub>FC)", 
+         y = "P value (-log<sub>10</sub>)", 
          caption = paste0("P value: <b>Not adjusted</b>
          <br>Number of significant markers: <b>", 
          FCR_Values %>% 
@@ -228,10 +228,10 @@ Volcano_nadj <- ggplot(FCR_Values, aes(x = log2FC, y = p_value_log10)) +
   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
   theme_minimal(base_size = 14) +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+  theme(plot.title = element_markdown(hjust = 0.5, face = "bold", size = 14),
         legend.title = element_blank(), 
-        axis.title.x = element_text(face = "bold"), 
-        axis.title.y = element_text(face = "bold"), 
+        axis.title.x = element_markdown(face = "bold"), 
+        axis.title.y = element_markdown(face = "bold"), 
         plot.caption.position = "plot", 
         plot.caption = element_markdown(hjust = 0.9, vjust = 1),
         panel.grid.major = element_line(color = "grey90"),
@@ -259,8 +259,8 @@ Volcano_FDR <- ggplot(FCR_Values, aes(x = log2FC, y = FDR_log10)) +
                      breaks = y_breaks_FDR, 
                      expand = c(0, 0)) +  
     labs(title = "Glycan expression change over a 12 month period", 
-         x = "Fold Change (log2FC)", 
-         y = "P value (-log10)", 
+         x = "Fold Change (log<sub>2</sub>FC)", 
+         y = "P value (-log<sub>10</sub>)", 
          caption = paste0("P value: <b>FDR adjusted</b>
          <br>Number of significant markers: <b>", 
          FCR_Values %>% 
@@ -269,10 +269,10 @@ Volcano_FDR <- ggplot(FCR_Values, aes(x = log2FC, y = FDR_log10)) +
     geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
     geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
     theme_minimal(base_size = 14) +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    theme(plot.title = element_markdown(hjust = 0.5, face = "bold", size = 14),
           legend.title = element_blank(), 
-          axis.title.x = element_text(face = "bold"), 
-          axis.title.y = element_text(face = "bold"), 
+          axis.title.x = element_markdown(face = "bold"), 
+          axis.title.y = element_markdown(face = "bold"), 
           plot.caption.position = "plot", 
           plot.caption = element_markdown(hjust = 0.9, vjust = 1),
           panel.grid.major = element_line(color = "grey90"),
@@ -345,7 +345,7 @@ Correlations <- expand_grid(Marker = colnames(Dataframes_Final_Wide_clean),
                                                   exact  = FALSE)),
          rho = map_dbl(test, "estimate"), 
          p.value = map_dbl(test, "p.value", )) %>%
-  mutate(P_adjust = p.adjust(p.value, method = "BH")) %>% 
+  mutate(P_adjust = p.adjust(p.value, method = "fdr")) %>% 
   select(-test) %>% 
   mutate(Origin = sub("_.*$", "", Marker)) %>% 
   inner_join(Directions, by = c("Marker", "Origin")) %>% 
@@ -366,6 +366,9 @@ Comparisons <- tribble(~Time_1, ~Time_2, ~Label,
                        "T0", "T0", "Baseline vs Baseline", 
                        "T12", "T12", "Month 12 vs Month 12",
                        "T0", "T12", "Baseline vs Month 12")
+
+Correlations %>% 
+  filter(P_adjust < 0.05)
 
 ```
 
@@ -400,7 +403,8 @@ Correlation_Results_Clean <-  Correlation_Results_Total %>%
          Origin = sub("_.*$", "", Marker), 
          Comparator = factor(Comparator, levels = c("AI", "CI", "eGFR", "UPCR", "SLEDAI2K")), 
          Comparison = factor(Comparison, levels = c("Baseline vs Baseline", "Month 12 vs Month 12", "Baseline vs Month 12"))) %>% 
-  rename(Correlation = "estimate")
+  rename(Correlation = "estimate") %>% 
+  inner_join(Directions, by = c("Marker", "Origin"))
   
 
 ```
@@ -413,9 +417,9 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
                        midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
                        guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
                                               title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
-  facet_grid(Origin ~ Comparison, nrow = 1) +
+  facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y", switch = "y") +
   # geom_text(aes(label = round(Correlation, 2)), size = 3) +
-  geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
+  geom_text(aes(label = Significance, vjust = 0, hjust = 0.5, fontface = "bold")) +
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
@@ -425,14 +429,14 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
   labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
   theme_minimal(base_size = 12) +
   theme(strip.placement = "outside",
-        strip.text.y.right = element_blank(),
+        strip.text.y.left = element_blank(),
         axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
         axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
         plot.title = element_text(face = "bold"))
 
-Dir_plot <- Correlations %>%
+Dir_plot <- Correlation_Results_Clean %>%
   distinct(Origin, Marker, Direction) %>% 
   ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
   geom_tile(color = "white", width = 1, height = 1) +
@@ -441,7 +445,7 @@ Dir_plot <- Correlations %>%
                                "Decrease" = "purple", 
                                "No change"  = "grey80"), 
                     guide = guide_legend(order = 2, title.position = "top", 
-                                         title = "T12 vs T0", title.theme = element_markdown(face = "bold", size = 12), 
+                                         title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
                                          title.hjust = 0, label.position = "right", 
                                          keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
   scale_y_discrete(expand = c(0,0)) +
@@ -450,7 +454,8 @@ Dir_plot <- Correlations %>%
   theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
         plot.margin = margin(0, 0, 0, 0), 
         panel.spacing.x = unit(0, "lines"),
-        panel.spacing = unit(1, "lines"))
+        panel.spacing = unit(1, "lines"), 
+        legend.title = element_markdown(face = "bold"))
 
 Combined_Plot <- Main_plot + Dir_plot +
   plot_layout(widths = c(0.95, 0.05), 
@@ -461,16 +466,101 @@ Combined_Plot <- Main_plot + Dir_plot +
         legend.position = "right",
         legend.title.position = "bottom")
 
-# ggsave(Combined_Plot, 
-#        filename = "~/SLE/Glycans/Plots/Glycans_Correlations_2.jpeg", 
-#        width = 10, height = 16, dpi = 300)
+ggsave(Combined_Plot,
+       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
+       width = 15, height = 25, dpi = 300)
 
 ```
 
 
-```{r}
+```{r Correlation plots by Origin}
 
-ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, fill = Correlation)) +
+Sub_Correlation_plots <- function(orig) {
+
+  Cor_df_current <- Correlation_Results_Clean %>% 
+    filter(Origin == orig)
+  
+  n_markers <- Cor_df_current %>% 
+    distinct(Marker) %>% 
+    nrow()
+  
+  Main_plot_current <- ggplot(Cor_df_current, aes(x = Comparator, y = Marker, fill = Correlation)) +
+    geom_tile(color = "white", width = 1, height = 1) +
+    scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                         midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                         guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                                title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+    facet_grid(. ~ Comparison, scales = "free_y", space = "free_y", switch = "y") +
+    # geom_text(aes(label = round(Correlation, 2)), size = 3) +
+    geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
+    scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+    scale_x_discrete(labels = function(x) {
+      x <- gsub("_", " ", x)
+      x <- gsub("Extra Renal", "Extra<br>Renal", x)
+      x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
+      x }, expand = c(0,0)) +
+    labs(title = paste0("Heatmap of Glycan Correlations<br>Origin: ", orig), x = NULL, y = NULL) +
+    theme_minimal(base_size = 12) +
+    theme(strip.placement = "outside",
+          strip.text.y.left = element_blank(),
+          axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
+          axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+          panel.grid  = element_blank(), 
+          panel.spacing = unit(1, "lines"), 
+          plot.title = element_markdown(face = "bold", lineheight = 1.2))
+  
+  Dir_plot_current <- Cor_dfMarkerDir_plot_current <- Cor_df_current %>%
+    distinct(Origin, Marker, Direction) %>% 
+    ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
+    geom_tile(color = "white", width = 1, height = 1) +
+    scale_fill_manual(values = c("Increase" = "mediumspringgreen",
+                                 "Decrease" = "purple", 
+                                 "No change"  = "grey80"), 
+                      guide = guide_legend(order = 2, title.position = "top", 
+                                           title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
+                                           title.hjust = 0, label.position = "right", 
+                                           keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
+    scale_y_discrete(expand = c(0,0)) +
+    scale_x_continuous(expand = c(0,0)) +
+    theme_void() +
+    theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+          plot.margin = margin(0, 0, 0, 0), 
+          panel.spacing.x = unit(0, "lines"),
+          panel.spacing = unit(1, "lines"), 
+          legend.title = element_markdown(face = "bold"))
+  
+  Combined_Plot_current <- Main_plot_current + Dir_plot_current +
+    plot_layout(widths = c(0.95, 0.05), 
+                # widths = c(length(unique(Correlations$Variable)), 1), 
+                guides = "collect") +   
+    plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
+    theme(legend.box = "vertical", 
+          legend.position = "right",
+          legend.title.position = "bottom")
+
+  
+  per_tile_height <- 0.1
+  plot_height <- max(n_markers * per_tile_height, 6)
+  
+  ggsave(Combined_Plot_current,
+       filename = paste0("~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_", orig,".jpeg"),
+       width = 15, 
+       height = plot_height,
+       dpi = 300)
+}
+
+plots_by_origin <- map(unique(Correlation_Results_Clean$Origin), Sub_Correlation_plots)
+
+```
+
+```{r Correlations visualisation - Significant only}
+
+Correlation_Results_Clean_Sign <- Correlation_Results_Clean %>%
+  group_by(Marker) %>% 
+  filter(any(Significance == "*")) %>% 
+  ungroup()
+
+Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
   scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
                        midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
@@ -488,12 +578,45 @@ ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, fill = Correla
   labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
   theme_minimal(base_size = 12) +
   theme(strip.placement = "outside",
-        strip.text.y.left = element_text(angle = 0, face = "bold"),
+        strip.text.y.left = element_blank(),
         axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
         axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
         plot.title = element_text(face = "bold"))
 
-```
+Dir_plot <- Correlation_Results_Clean_Sign %>%
+  distinct(Origin, Marker, Direction) %>% 
+  ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  facet_grid(Origin ~ ., scales = "free_y", space  = "free_y", switch = "x") +
+  scale_fill_manual(values = c("Increase" = "mediumspringgreen",
+                               "Decrease" = "purple", 
+                               "No change"  = "grey80"), 
+                    guide = guide_legend(order = 2, title.position = "top", 
+                                         title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
+                                         title.hjust = 0, label.position = "right", 
+                                         keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
+  scale_y_discrete(expand = c(0,0)) +
+  scale_x_continuous(expand = c(0,0)) +
+  theme_void() +
+  theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        plot.margin = margin(0, 0, 0, 0), 
+        panel.spacing.x = unit(0, "lines"),
+        panel.spacing = unit(1, "lines"), 
+        legend.title = element_markdown(face = "bold"))
 
+Combined_Plot <- Main_plot + Dir_plot +
+  plot_layout(widths = c(0.95, 0.05), 
+              # widths = c(length(unique(Correlations$Variable)), 1), 
+              guides = "collect") +   
+  plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
+  theme(legend.box = "vertical", 
+        legend.position = "right",
+        legend.title.position = "bottom")
+
+ggsave(Combined_Plot,
+       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
+       width = 15, height = 25, dpi = 300)
+
+```
