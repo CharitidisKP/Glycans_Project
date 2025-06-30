@@ -619,8 +619,52 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
 #         legend.position = "right",
 #         legend.title.position = "bottom")
 
-ggsave(Combined_Plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
-       width = 15, height = 25, dpi = 300)
+# ggsave(Combined_Plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
+#        width = 15, height = 25, dpi = 300)
 
 ```
+
+```{r Figure 3 preparation}
+
+AI_CI_data <- read_xlsx("~/SLE/Glycans/Data/AI_CI_data.xlsx") %>% 
+  rename(ID = "Patients")
+
+AI_CI_Scores <- AI_CI_data %>% 
+  select(ID, Time_point, `NIH AI SCORE`, `NIH IC SCORE`)
+
+AI_CI_data_clean <- AI_CI_data %>% 
+  select(-c(`NIH AI SCORE`, `NIH IC SCORE`)) %>% 
+  pivot_longer(cols = -c(ID, Time_point), names_to = "Result", values_to = "Result_Value") %>% 
+  separate(col = Result, into = c("Category", "Result"), sep = " - ", extra = "merge") %>% 
+  mutate(Category = gsub(" ", "_", Category), 
+         Result = gsub("[ ,\\-]+", "_", Result),
+         Result_Value = na_if(Result_Value, "NA"),
+         Result_Value = if_else(is.na(Result_Value), 
+                         NA_real_, 
+                         if_else(Result_Value > 0, 1, 0)), 
+         Result_Value = factor(Result_Value, levels = c(0,1))) %>%
+  inner_join(Dataframes_Final, by = c("ID", "Time_point"), relationship = "many-to-many") 
+  
+NIH_Test_Results <- AI_CI_data_clean %>% 
+  filter(!is.na(Result_Value)) %>%   
+  group_by(Marker, Category, Result, Time_point) %>%
+  filter(n_distinct(Result_Value) == 2) %>%
+  summarize(NIH_Test = list(wilcox.test(Value ~ Result_Value, 
+                                 data = cur_data(), 
+                                 exact = FALSE)), 
+            .groups = "drop") %>% 
+  mutate(NIH_Test = map(NIH_Test, tidy)) %>% 
+  unnest(NIH_Test, names_sep = "_") %>%
+  group_by(Time_point) %>%
+  mutate(NIH_FDR = p.adjust(NIH_Test_p.value, method = "fdr")) %>%
+  ungroup()
+
+NIH_Test_Results %>% 
+  filter(NIH_Test_p.value < 0.05)
+
+
+
+
+```
+
