@@ -643,28 +643,113 @@ AI_CI_data_clean <- AI_CI_data %>%
          Result_Value = if_else(is.na(Result_Value), 
                          NA_real_, 
                          if_else(Result_Value > 0, 1, 0)), 
-         Result_Value = factor(Result_Value, levels = c(0,1))) %>%
+         Result_Value = factor(Result_Value, levels = c(0,1))) 
+
+AI_CI_data_joint <- AI_CI_data_clean %>%
   inner_join(Dataframes_Final, by = c("ID", "Time_point"), relationship = "many-to-many") 
   
-NIH_Test_Results <- AI_CI_data_clean %>% 
+NIH_Test_Results <- AI_CI_data_joint %>% 
   filter(!is.na(Result_Value)) %>%   
   group_by(Marker, Category, Result, Time_point) %>%
   filter(n_distinct(Result_Value) == 2) %>%
   summarize(NIH_Test = list(wilcox.test(Value ~ Result_Value, 
                                  data = cur_data(), 
                                  exact = FALSE)), 
+            
+            NIH_Cor_Test = list(cor.test(Value, Result_Value, 
+                                   method = "spearman", 
+                                   exact = FALSE)),
+            
             .groups = "drop") %>% 
-  mutate(NIH_Test = map(NIH_Test, tidy)) %>% 
-  unnest(NIH_Test, names_sep = "_") %>%
+  mutate(Wilcox = map(NIH_Test, tidy), 
+         Spearman = map(NIH_Cor_Test, tidy)) %>% 
+  unnest(c(Wilcox, Spearman), names_sep = "_") %>%
   group_by(Time_point) %>%
-  mutate(NIH_FDR = p.adjust(NIH_Test_p.value, method = "fdr")) %>%
+  mutate(Wilcox_FDR = p.adjust(Wilcox_p.value, method = "fdr"), 
+         Spearman_FDR = p.adjust(Spearman_p.value, method = "fdr")) %>%
   ungroup()
 
-NIH_Test_Results %>% 
-  filter(NIH_Test_p.value < 0.05)
 
 
 
+```
+
+```{r Figure 3 Visualisation - MISSING}
+
+
+```
+
+```{r Delta - Delta correlation}
+
+Glycan_Deltas <- Dataframes_Final_Sign %>% 
+  group_by(ID, Marker) %>% 
+  mutate(M_Delta = order_by(Time_point, Value - lag(Value)), 
+         M_Delta = ifelse(is.na(M_Delta), 0, M_Delta)) %>%
+  filter(Time_point == "T12") %>% 
+  select(-c(Time_point, Value, Origin)) %>% 
+  pivot_wider(id_cols = ID, 
+              names_from = Marker, 
+              values_from = M_Delta) %>% 
+  column_to_rownames(var = "ID")
+
+Comparator_Values_Delta <- Comparator_Values %>% 
+  pivot_longer(cols = -c(ID, Time_point), names_to = "Comparator", values_to = "Comp_Value") %>% 
+  group_by(ID, Comparator) %>% 
+  mutate(Comp_Delta = order_by(Time_point, Comp_Value - lag(Comp_Value)), 
+         Comp_Delta = ifelse(is.na(Comp_Delta), 0, Comp_Delta)) %>% 
+  filter(Time_point == "T12") %>% 
+  select(-c(Time_point, Comp_Value)) %>% 
+  pivot_wider(id_cols = ID, 
+              names_from = Comparator, 
+              values_from = Comp_Delta) %>% 
+  column_to_rownames(var = "ID")
+
+
+DFs_Delta_Combined <- cbind(Glycan_Deltas, Comparator_Values_Delta) 
+
+Correlations_Delta <- expand_grid(Marker = colnames(Glycan_Deltas), 
+              Variable = colnames(Comparator_Values_Delta)) %>% 
+  mutate(test = map2(Marker, 
+                     Variable, ~ cor.test(DFs_Delta_Combined[[.x]], 
+                                          DFs_Delta_Combined[[.y]], 
+                                          method = "spearman", 
+                                          exact  = FALSE)),
+         rho = map_dbl(test, "estimate"), 
+         p.value = map_dbl(test, "p.value", )) %>%
+  mutate(P_adjust = p.adjust(p.value, method = "BH")) %>% 
+  select(-test) %>% 
+  mutate(Origin = sub("_.*$", "", Marker)) %>% 
+  inner_join(Directions, by = c("Marker", "Origin")) %>% 
+  rename(Correlation = "rho") %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*"))
+
+```
+
+
+```{r Delta - Month 12 Correlation}
+
+Delta_vs_M12 <- Comparator_Values %>% 
+  filter(Time_point == "T12") %>% 
+  select(-Time_point) %>% 
+  inner_join(Glycan_Deltas %>% 
+               rownames_to_column(var = "ID"), 
+             by = "ID")
+
+expand_grid(Marker = colnames(Glycan_Deltas), 
+              Variable = colnames(Comparator_Values_Delta)) %>% 
+  mutate(test = map2(Marker, 
+                     Variable, ~ cor.test(Delta_vs_M12[[.x]], 
+                                          Delta_vs_M12[[.y]], 
+                                          method = "spearman", 
+                                          exact  = FALSE)),
+         rho = map_dbl(test, "estimate"), 
+         p.value = map_dbl(test, "p.value", )) %>%
+  mutate(P_adjust = p.adjust(p.value, method = "BH")) %>% 
+  select(-test) %>% 
+  mutate(Origin = sub("_.*$", "", Marker)) %>% 
+  inner_join(Directions, by = c("Marker", "Origin")) %>% 
+  rename(Correlation = "rho") %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*"))
 
 ```
 
