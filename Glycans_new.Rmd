@@ -239,9 +239,9 @@ Volcano_nadj <- ggplot(FCR_Values, aes(x = log2FC, y = p_value_log10)) +
   geom_text_repel(data = Top_Glycans_nadj, aes(label = Marker), 
                   size = 3, 
                   force = 2,
-                  box.padding = 0.6, 
+                  box.padding = 0.3, 
                   point.padding = 0.1, 
-                  segment.color = "black", 
+                  segment.color = NA, 
                   max.overlaps = Inf, 
                   min.segment.length = 0)
 
@@ -280,9 +280,9 @@ Volcano_FDR <- ggplot(FCR_Values, aes(x = log2FC, y = FDR_log10)) +
   geom_text_repel(data = Top_Glycans_FDR, aes(label = Marker), 
                   size = 3, 
                   force = 2,
-                  box.padding = 0.6, 
+                  box.padding = 0.3, 
                   point.padding = 0.1, 
-                  segment.color = "black", 
+                  segment.color = NA, 
                   max.overlaps = Inf, 
                   min.segment.length = 0)
 
@@ -417,7 +417,7 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
                        midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
                        guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
                                               title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
-  facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y", switch = "y") +
+  facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y") +
   # geom_text(aes(label = round(Correlation, 2)), size = 3) +
   geom_text(aes(label = Significance, vjust = 0, hjust = 0.5, fontface = "bold")) +
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
@@ -429,59 +429,68 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
   labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
   theme_minimal(base_size = 12) +
   theme(strip.placement = "outside",
-        strip.text.y.left = element_blank(),
+        strip.text.y.right = element_text(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
         axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
         axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
         plot.title = element_text(face = "bold"))
 
-Dir_plot <- Correlation_Results_Clean %>%
-  distinct(Origin, Marker, Direction) %>% 
-  ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
-  geom_tile(color = "white", width = 1, height = 1) +
-  facet_grid(Origin ~ ., scales = "free_y", space  = "free_y", switch = "x") +
-  scale_fill_manual(values = c("Increase" = "mediumspringgreen",
-                               "Decrease" = "purple", 
-                               "No change"  = "grey80"), 
-                    guide = guide_legend(order = 2, title.position = "top", 
-                                         title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
-                                         title.hjust = 0, label.position = "right", 
-                                         keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
-  scale_y_discrete(expand = c(0,0)) +
-  scale_x_continuous(expand = c(0,0)) +
-  theme_void() +
-  theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
-        plot.margin = margin(0, 0, 0, 0), 
-        panel.spacing.x = unit(0, "lines"),
-        panel.spacing = unit(1, "lines"), 
-        legend.title = element_markdown(face = "bold"))
+# Dir_plot <- Correlation_Results_Clean %>%
+#   distinct(Origin, Marker, Direction) %>% 
+#   ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
+#   geom_tile(color = "white", width = 1, height = 1) +
+#   facet_grid(Origin ~ ., scales = "free_y", space  = "free_y", switch = "x") +
+#   scale_fill_manual(values = c("Increase" = "mediumspringgreen",
+#                                "Decrease" = "purple", 
+#                                "No change"  = "grey80"), 
+#                     guide = guide_legend(order = 2, title.position = "top", 
+#                                          title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
+#                                          title.hjust = 0, label.position = "right", 
+#                                          keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
+#   scale_y_discrete(expand = c(0,0)) +
+#   scale_x_continuous(expand = c(0,0)) +
+#   theme_void() +
+#   theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+#         plot.margin = margin(0, 0, 0, 0), 
+#         panel.spacing.x = unit(0, "lines"),
+#         panel.spacing = unit(1, "lines"), 
+#         legend.title = element_markdown(face = "bold"))
+# 
+# Combined_Plot <- Main_plot + Dir_plot +
+#   plot_layout(widths = c(0.95, 0.05), 
+#               # widths = c(length(unique(Correlations$Variable)), 1), 
+#               guides = "collect") +   
+#   plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
+#   theme(legend.box = "vertical", 
+#         legend.position = "right",
+#         legend.title.position = "bottom")
 
-Combined_Plot <- Main_plot + Dir_plot +
-  plot_layout(widths = c(0.95, 0.05), 
-              # widths = c(length(unique(Correlations$Variable)), 1), 
-              guides = "collect") +   
-  plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
-  theme(legend.box = "vertical", 
-        legend.position = "right",
-        legend.title.position = "bottom")
-
-ggsave(Combined_Plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
-       width = 15, height = 25, dpi = 300)
+# ggsave(Combined_Plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
+#        width = 15, height = 25, dpi = 300)
 
 ```
 
 
 ```{r Correlation plots by Origin}
 
+Correlation_Results_Clean_Sign <- Correlation_Results_Clean %>%
+  group_by(Marker) %>% 
+  filter(any(Significance == "*")) %>% 
+  ungroup()
+
 Sub_Correlation_plots <- function(orig) {
 
-  Cor_df_current <- Correlation_Results_Clean %>% 
+  Cor_df_current <- Correlation_Results_Clean_Sign %>% 
     filter(Origin == orig)
   
   n_markers <- Cor_df_current %>% 
     distinct(Marker) %>% 
+    nrow()
+  
+  n_comp <- Cor_df_current %>% 
+    distinct(Comparator) %>% 
     nrow()
   
   Main_plot_current <- ggplot(Cor_df_current, aes(x = Comparator, y = Marker, fill = Correlation)) +
@@ -490,7 +499,7 @@ Sub_Correlation_plots <- function(orig) {
                          midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
                          guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
                                                 title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
-    facet_grid(. ~ Comparison, scales = "free_y", space = "free_y", switch = "y") +
+    facet_wrap(~Comparison, nrow = 1) +
     # geom_text(aes(label = round(Correlation, 2)), size = 3) +
     geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
     scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
@@ -507,42 +516,42 @@ Sub_Correlation_plots <- function(orig) {
           axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
           panel.grid  = element_blank(), 
           panel.spacing = unit(1, "lines"), 
-          plot.title = element_markdown(face = "bold", lineheight = 1.2))
+          plot.title = element_markdown(face = "bold", lineheight = 1.2),
+          aspect.ratio = n_markers/n_comp * 0.3,  
+          plot.margin = margin(5, 5, 5, 5, "pt"))
   
-  Dir_plot_current <- Cor_dfMarkerDir_plot_current <- Cor_df_current %>%
-    distinct(Origin, Marker, Direction) %>% 
-    ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
-    geom_tile(color = "white", width = 1, height = 1) +
-    scale_fill_manual(values = c("Increase" = "mediumspringgreen",
-                                 "Decrease" = "purple", 
-                                 "No change"  = "grey80"), 
-                      guide = guide_legend(order = 2, title.position = "top", 
-                                           title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
-                                           title.hjust = 0, label.position = "right", 
-                                           keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
-    scale_y_discrete(expand = c(0,0)) +
-    scale_x_continuous(expand = c(0,0)) +
-    theme_void() +
-    theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
-          plot.margin = margin(0, 0, 0, 0), 
-          panel.spacing.x = unit(0, "lines"),
-          panel.spacing = unit(1, "lines"), 
-          legend.title = element_markdown(face = "bold"))
-  
-  Combined_Plot_current <- Main_plot_current + Dir_plot_current +
-    plot_layout(widths = c(0.95, 0.05), 
-                # widths = c(length(unique(Correlations$Variable)), 1), 
-                guides = "collect") +   
-    plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
-    theme(legend.box = "vertical", 
-          legend.position = "right",
-          legend.title.position = "bottom")
+  # Dir_plot_current <- Cor_dfMarkerDir_plot_current <- Cor_df_current %>%
+  #   distinct(Origin, Marker, Direction) %>% 
+  #   ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
+  #   geom_tile(color = "white", width = 1, height = 1) +
+  #   scale_fill_manual(values = c("Increase" = "mediumspringgreen",
+  #                                "Decrease" = "purple", 
+  #                                "No change"  = "grey80"), 
+  #                     guide = guide_legend(order = 2, title.position = "top", 
+  #                                          title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
+  #                                          title.hjust = 0, label.position = "right", 
+  #                                          keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
+  #   scale_y_discrete(expand = c(0,0)) +
+  #   scale_x_continuous(expand = c(0,0)) +
+  #   theme_void() +
+  #   theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+  #         plot.margin = margin(0, 0, 0, 0), 
+  #         panel.spacing.x = unit(0, "lines"),
+  #         panel.spacing = unit(1, "lines"), 
+  #         legend.title = element_markdown(face = "bold"))
+  # 
+  # Combined_Plot_current <- Main_plot_current + Dir_plot_current +
+  #   plot_layout(widths = c(0.95, 0.05), 
+  #               # widths = c(length(unique(Correlations$Variable)), 1), 
+  #               guides = "collect") +   
+  #   plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
+  #   theme(legend.box = "vertical", 
+  #         legend.position = "right",
+  #         legend.title.position = "bottom")
 
+  plot_height <- max(n_markers * 0.3, 4)
   
-  per_tile_height <- 0.1
-  plot_height <- max(n_markers * per_tile_height, 6)
-  
-  ggsave(Combined_Plot_current,
+  ggsave(Main_plot_current,
        filename = paste0("~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_", orig,".jpeg"),
        width = 15, 
        height = plot_height,
@@ -555,18 +564,13 @@ plots_by_origin <- map(unique(Correlation_Results_Clean$Origin), Sub_Correlation
 
 ```{r Correlations visualisation - Significant only}
 
-Correlation_Results_Clean_Sign <- Correlation_Results_Clean %>%
-  group_by(Marker) %>% 
-  filter(any(Significance == "*")) %>% 
-  ungroup()
-
 Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
   scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
                        midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
                        guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
                                               title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
-  facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y", switch = "y") +
+  facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y") +
   # geom_text(aes(label = round(Correlation, 2)), size = 3) +
   geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
@@ -578,42 +582,42 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
   labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
   theme_minimal(base_size = 12) +
   theme(strip.placement = "outside",
-        strip.text.y.left = element_blank(),
+        strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
         axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
         axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
         plot.title = element_text(face = "bold"))
 
-Dir_plot <- Correlation_Results_Clean_Sign %>%
-  distinct(Origin, Marker, Direction) %>% 
-  ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
-  geom_tile(color = "white", width = 1, height = 1) +
-  facet_grid(Origin ~ ., scales = "free_y", space  = "free_y", switch = "x") +
-  scale_fill_manual(values = c("Increase" = "mediumspringgreen",
-                               "Decrease" = "purple", 
-                               "No change"  = "grey80"), 
-                    guide = guide_legend(order = 2, title.position = "top", 
-                                         title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
-                                         title.hjust = 0, label.position = "right", 
-                                         keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
-  scale_y_discrete(expand = c(0,0)) +
-  scale_x_continuous(expand = c(0,0)) +
-  theme_void() +
-  theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
-        plot.margin = margin(0, 0, 0, 0), 
-        panel.spacing.x = unit(0, "lines"),
-        panel.spacing = unit(1, "lines"), 
-        legend.title = element_markdown(face = "bold"))
-
-Combined_Plot <- Main_plot + Dir_plot +
-  plot_layout(widths = c(0.95, 0.05), 
-              # widths = c(length(unique(Correlations$Variable)), 1), 
-              guides = "collect") +   
-  plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
-  theme(legend.box = "vertical", 
-        legend.position = "right",
-        legend.title.position = "bottom")
+# Dir_plot <- Correlation_Results_Clean_Sign %>%
+#   distinct(Origin, Marker, Direction) %>% 
+#   ggplot(., aes(x = 1, y = Marker, fill = Direction)) +
+#   geom_tile(color = "white", width = 1, height = 1) +
+#   facet_grid(Origin ~ ., scales = "free_y", space  = "free_y", switch = "x") +
+#   scale_fill_manual(values = c("Increase" = "mediumspringgreen",
+#                                "Decrease" = "purple", 
+#                                "No change"  = "grey80"), 
+#                     guide = guide_legend(order = 2, title.position = "top", 
+#                                          title = "Month 12 <br>vs Baseline", title.theme = element_markdown(face = "bold", size = 12), 
+#                                          title.hjust = 0, label.position = "right", 
+#                                          keywidth = unit(0.5, "cm"), keyheight = unit(0.4, "cm"))) +
+#   scale_y_discrete(expand = c(0,0)) +
+#   scale_x_continuous(expand = c(0,0)) +
+#   theme_void() +
+#   theme(strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+#         plot.margin = margin(0, 0, 0, 0), 
+#         panel.spacing.x = unit(0, "lines"),
+#         panel.spacing = unit(1, "lines"), 
+#         legend.title = element_markdown(face = "bold"))
+# 
+# Combined_Plot <- Main_plot + Dir_plot +
+#   plot_layout(widths = c(0.95, 0.05), 
+#               # widths = c(length(unique(Correlations$Variable)), 1), 
+#               guides = "collect") +   
+#   plot_annotation(theme = theme(plot.margin = margin(0, 0, 0, 0))) &
+#   theme(legend.box = "vertical", 
+#         legend.position = "right",
+#         legend.title.position = "bottom")
 
 ggsave(Combined_Plot,
        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
