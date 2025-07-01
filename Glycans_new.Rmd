@@ -29,7 +29,6 @@ library(ggrepel)
 
 Pallete <- c("coral1", "deeppink3", "midnightblue", "cyan3", "mediumspringgreen", "yellow3")
 
-
 ```
 
 ```{r Load the data}
@@ -46,12 +45,13 @@ Glycan_Outcomes <- read_xlsx("~/SLE/Glycans/Data/Glycans_Outcomes.xlsx")
 
 ```
 
-
 ```{r Prep slightly}
 
 Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "total", "extra-renal", "Renal Impairment", "Clinical")
 
 Select_Comparators <- c("AI", "CI", "eGFR", "UPCR", "total")
+
+Comparator_Levels <- c("AI", "CI", "eGFR", "UPCR", "SLEDAI-2K")
 
 # Renal_Impairment = `Renal Impairment`,
 #          Extra_Renal = `extra-renal`,
@@ -61,19 +61,20 @@ Select_Comparators <- c("AI", "CI", "eGFR", "UPCR", "total")
 Comparator_Values <- Increased_data %>%
   rename(ID = `Patient number`, Time_point = `Time point`) %>%
   select(ID, Time_point, any_of(Select_Comparators)) %>%
-  rename(SLEDAI2K = total) %>%
+  rename('SLEDAI-2K' = total) %>%
   # mutate(Identification = paste0(ID, " ", Time_point)) %>%
   # select(-c(ID, Time_point)) %>%
   select(ID, Time_point, everything()) %>%
   # column_to_rownames("Identification") %>%
   mutate(across(.cols = -c(ID, Time_point), .fns = as.numeric))
 
-Comparator_Values_New <- Increased_data %>%
+Comparator_Values_Long <- Increased_data %>%
   rename(ID = `Patient number`, Time_point = `Time point`) %>%
   select(ID, Time_point, any_of(Select_Comparators)) %>%
-  rename(SLEDAI2K = total) %>%
+  rename('SLEDAI-2K' = total) %>%
   mutate(across(.cols = -c(ID, Time_point), .fns = as.numeric)) %>% 
-  pivot_longer(cols = -c(ID, Time_point), names_to = "Comparator", values_to = "Value")
+  pivot_longer(cols = -c(ID, Time_point), names_to = "Comparator", values_to = "Value") %>% 
+  mutate(Comparator = factor(Comparator, levels = Comparator_Levels))
 
 ```
 
@@ -97,7 +98,6 @@ Process_DFs <- function(df){
 Long_Dataframes <- map(Dataframes, Process_DFs)
 ```
 
-
 ```{r Calculate the log2FC ratios}
 
 FCR_list <- imap(Long_Dataframes, ~ {
@@ -118,15 +118,6 @@ FCR_list <- imap(Long_Dataframes, ~ {
 FCR_Values <- bind_rows(FCR_list)
 
 ```
-
-
-
-
-
-
-
-
-
 
 ```{r Get the direction of each marker}
 
@@ -201,7 +192,6 @@ y_breaks_FDR <- pretty(range(FCR_Values$FDR_log10), n = 3)
 
 
 ```
-
 
 ```{r Volcano visualisation}
 
@@ -286,15 +276,14 @@ Volcano_FDR <- ggplot(FCR_Values, aes(x = log2FC, y = FDR_log10)) +
                   max.overlaps = Inf, 
                   min.segment.length = 0)
 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_nadj.jpeg"),
-#        plot = Volcano_nadj, width = 10, height = 8, dpi = 300, device = "jpeg")
-# 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR.jpeg"),
-#        plot = Volcano_FDR, width = 10, height = 8, dpi = 300, device = "jpeg")
+ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_nadj.jpeg"),
+       plot = Volcano_nadj, width = 10, height = 8, dpi = 300, device = "jpeg")
+
+ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR.jpeg"),
+       plot = Volcano_FDR, width = 10, height = 8, dpi = 300, device = "jpeg")
 
 
 ```
-
 
 ```{r Combine the direction with the tests}
 
@@ -352,23 +341,16 @@ Correlations <- expand_grid(Marker = colnames(Dataframes_Final_Wide_clean),
   rename(Correlation = "rho") %>% 
   mutate(Significance = case_when(p.value < 0.05 ~ "*"))
 
-
-
-
-
 Marker_DF <- Dataframes_Final %>% 
   rename(Marker_Value = "Value") 
 
-Comp_DF <- Comparator_Values_New %>% 
+Comp_DF <- Comparator_Values_Long %>% 
   rename(Comp_Value = "Value")
 
 Comparisons <- tribble(~Time_1, ~Time_2, ~Label, 
                        "T0", "T0", "Baseline vs Baseline", 
                        "T12", "T12", "Month 12 vs Month 12",
                        "T0", "T12", "Baseline vs Month 12")
-
-Correlations %>% 
-  filter(P_adjust < 0.05)
 
 ```
 
@@ -401,7 +383,7 @@ Correlation_Results_Clean <-  Correlation_Results_Total %>%
   mutate(FDR = p.adjust(p.value, method = "fdr"), 
          Significance = case_when(p.value < 0.05 ~ "*"), 
          Origin = sub("_.*$", "", Marker), 
-         Comparator = factor(Comparator, levels = c("AI", "CI", "eGFR", "UPCR", "SLEDAI2K")), 
+         Comparator = factor(Comparator, levels = Comparator_Levels), 
          Comparison = factor(Comparison, levels = c("Baseline vs Baseline", "Month 12 vs Month 12", "Baseline vs Month 12"))) %>% 
   rename(Correlation = "estimate") %>% 
   inner_join(Directions, by = c("Marker", "Origin"))
@@ -426,7 +408,9 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
     x <- gsub("Extra Renal", "Extra<br>Renal", x)
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
-  labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
+  labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL, 
+       caption = paste0("Correlation coefficient used: <b>Spearman</b> 
+         <br>P value: <b>Not adjusted</b>")) +
   theme_minimal(base_size = 12) +
   theme(strip.placement = "outside",
         strip.text.y.right = element_text(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
@@ -434,6 +418,8 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
         axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
         plot.title = element_text(face = "bold"))
 
 # Dir_plot <- Correlation_Results_Clean %>%
@@ -466,12 +452,11 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
 #         legend.position = "right",
 #         legend.title.position = "bottom")
 
-# ggsave(Combined_Plot,
-#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
-#        width = 15, height = 25, dpi = 300)
+ggsave(Main_plot,
+       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
+       width = 15, height = 25, dpi = 300)
 
 ```
-
 
 ```{r Correlation plots by Origin}
 
@@ -508,7 +493,9 @@ Sub_Correlation_plots <- function(orig) {
       x <- gsub("Extra Renal", "Extra<br>Renal", x)
       x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
       x }, expand = c(0,0)) +
-    labs(title = paste0("Heatmap of Glycan Correlations<br>Origin: ", orig), x = NULL, y = NULL) +
+    labs(title = paste0("Heatmap of Glycan Correlations<br>Origin: ", orig), x = NULL, y = NULL,
+         caption = paste0("Correlation coefficient used: <b>Spearman</b> 
+         <br>P value: <b>Not adjusted</b>")) +
     theme_minimal(base_size = 12) +
     theme(strip.placement = "outside",
           strip.text.y.left = element_blank(),
@@ -518,6 +505,8 @@ Sub_Correlation_plots <- function(orig) {
           panel.spacing = unit(1, "lines"), 
           plot.title = element_markdown(face = "bold", lineheight = 1.2),
           aspect.ratio = n_markers/n_comp * 0.3,  
+          plot.caption.position = "plot", 
+          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
           plot.margin = margin(5, 5, 5, 5, "pt"))
   
   # Dir_plot_current <- Cor_dfMarkerDir_plot_current <- Cor_df_current %>%
@@ -579,7 +568,9 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
     x <- gsub("Extra Renal", "Extra<br>Renal", x)
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
-  labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL) +
+  labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL,
+       caption = paste0("Correlation coefficient used: <b>Spearman</b> 
+       <br>P value: <b>Not adjusted</b>")) +
   theme_minimal(base_size = 12) +
   theme(strip.placement = "outside",
         strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
@@ -587,6 +578,8 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
         axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
         plot.title = element_text(face = "bold"))
 
 # Dir_plot <- Correlation_Results_Clean_Sign %>%
@@ -619,9 +612,9 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
 #         legend.position = "right",
 #         legend.title.position = "bottom")
 
-# ggsave(Combined_Plot,
-#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
-#        width = 15, height = 25, dpi = 300)
+ggsave(Main_plot,
+       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
+       width = 15, height = 25, dpi = 300)
 
 ```
 
@@ -642,8 +635,7 @@ AI_CI_data_clean <- AI_CI_data %>%
          Result_Value = na_if(Result_Value, "NA"),
          Result_Value = if_else(is.na(Result_Value), 
                          NA_real_, 
-                         if_else(Result_Value > 0, 1, 0)), 
-         Result_Value = factor(Result_Value, levels = c(0,1))) 
+                         if_else(Result_Value > 0, 1, 0))) 
 
 AI_CI_data_joint <- AI_CI_data_clean %>%
   inner_join(Dataframes_Final, by = c("ID", "Time_point"), relationship = "many-to-many") 
@@ -652,7 +644,7 @@ NIH_Test_Results <- AI_CI_data_joint %>%
   filter(!is.na(Result_Value)) %>%   
   group_by(Marker, Category, Result, Time_point) %>%
   filter(n_distinct(Result_Value) == 2) %>%
-  summarize(NIH_Test = list(wilcox.test(Value ~ Result_Value, 
+  summarize(NIH_Test = list(wilcox.test(Value ~ factor(Result_Value), 
                                  data = cur_data(), 
                                  exact = FALSE)), 
             
@@ -668,9 +660,6 @@ NIH_Test_Results <- AI_CI_data_joint %>%
   mutate(Wilcox_FDR = p.adjust(Wilcox_p.value, method = "fdr"), 
          Spearman_FDR = p.adjust(Spearman_p.value, method = "fdr")) %>%
   ungroup()
-
-
-
 
 ```
 
@@ -692,8 +681,9 @@ Glycan_Deltas <- Dataframes_Final_Sign %>%
               values_from = M_Delta) %>% 
   column_to_rownames(var = "ID")
 
-Comparator_Values_Delta <- Comparator_Values %>% 
-  pivot_longer(cols = -c(ID, Time_point), names_to = "Comparator", values_to = "Comp_Value") %>% 
+Comparator_Values_Delta <- Comparator_Values_Long %>% 
+  rename(Comp_Value = "Value") %>% 
+  # pivot_longer(cols = -c(ID, Time_point), names_to = "Comparator", values_to = "Comp_Value") %>% 
   group_by(ID, Comparator) %>% 
   mutate(Comp_Delta = order_by(Time_point, Comp_Value - lag(Comp_Value)), 
          Comp_Delta = ifelse(is.na(Comp_Delta), 0, Comp_Delta)) %>% 
@@ -708,9 +698,9 @@ Comparator_Values_Delta <- Comparator_Values %>%
 DFs_Delta_Combined <- cbind(Glycan_Deltas, Comparator_Values_Delta) 
 
 Correlations_Delta <- expand_grid(Marker = colnames(Glycan_Deltas), 
-              Variable = colnames(Comparator_Values_Delta)) %>% 
+              Comparator = colnames(Comparator_Values_Delta)) %>% 
   mutate(test = map2(Marker, 
-                     Variable, ~ cor.test(DFs_Delta_Combined[[.x]], 
+                     Comparator, ~ cor.test(DFs_Delta_Combined[[.x]], 
                                           DFs_Delta_Combined[[.y]], 
                                           method = "spearman", 
                                           exact  = FALSE)),
@@ -721,10 +711,60 @@ Correlations_Delta <- expand_grid(Marker = colnames(Glycan_Deltas),
   mutate(Origin = sub("_.*$", "", Marker)) %>% 
   inner_join(Directions, by = c("Marker", "Origin")) %>% 
   rename(Correlation = "rho") %>% 
-  mutate(Significance = case_when(p.value < 0.05 ~ "*"))
+  mutate(Significance = case_when(p.value < 0.05 ~ "*"), 
+         Comparator = factor(Comparator, levels = Comparator_Levels))
 
 ```
 
+```{r Delta visualisations}
+
+Correlations_Delta_Sign <- Correlations_Delta %>%
+  group_by(Marker) %>% 
+  filter(any(Significance == "*")) %>% 
+  ungroup()
+
+Main_plot <- ggplot(Correlations_Delta_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+  facet_grid(Origin ~ ., scales = "free_y", space = "free_y") +
+  # geom_text(aes(label = round(Correlation, 2)), size = 3) +
+  geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
+  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("_", " ", x)
+    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
+    x }, expand = c(0,0)) +
+  labs(title = "Correlations between glycan and marker deltas", x = NULL, y = NULL,
+       caption = paste0("Correlation coefficient used: <b>Spearman</b> 
+       <br>P value: <b>Not adjusted</b>")) +
+  theme_minimal(base_size = 12) +
+  theme(strip.placement = "outside",
+        strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
+        axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+        panel.grid  = element_blank(), 
+        panel.spacing = unit(1, "lines"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+        plot.title = element_markdown(face = "bold"))
+
+n_markers <- Correlations_Delta_Sign %>% 
+    distinct(Marker) %>% 
+    nrow()
+
+plot_height <- max(n_markers * 0.3, 4)
+
+ggsave(Main_plot,
+       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Delta_sign_only.jpeg",
+       width = 15, height = plot_height, dpi = 300)
+
+
+
+```
 
 ```{r Delta - Month 12 Correlation}
 
@@ -735,10 +775,10 @@ Delta_vs_M12 <- Comparator_Values %>%
                rownames_to_column(var = "ID"), 
              by = "ID")
 
-expand_grid(Marker = colnames(Glycan_Deltas), 
-              Variable = colnames(Comparator_Values_Delta)) %>% 
+Glycan_Deltas_vs_M12_Cor <- expand_grid(Marker = colnames(Glycan_Deltas), 
+              Comparator = colnames(Comparator_Values_Delta)) %>% 
   mutate(test = map2(Marker, 
-                     Variable, ~ cor.test(Delta_vs_M12[[.x]], 
+                     Comparator, ~ cor.test(Delta_vs_M12[[.x]], 
                                           Delta_vs_M12[[.y]], 
                                           method = "spearman", 
                                           exact  = FALSE)),
@@ -749,7 +789,55 @@ expand_grid(Marker = colnames(Glycan_Deltas),
   mutate(Origin = sub("_.*$", "", Marker)) %>% 
   inner_join(Directions, by = c("Marker", "Origin")) %>% 
   rename(Correlation = "rho") %>% 
-  mutate(Significance = case_when(p.value < 0.05 ~ "*"))
+  mutate(Significance = case_when(p.value < 0.05 ~ "*"), 
+         Comparator = factor(Comparator, levels = Comparator_Levels))
 
+```
+
+```{r Delta vs Month 12 visualisation}
+
+Glycan_Deltas_vs_M12_Cor_Sign <- Glycan_Deltas_vs_M12_Cor %>%
+  group_by(Marker) %>% 
+  filter(any(Significance == "*")) %>% 
+  ungroup()
+
+Main_plot <- ggplot(Glycan_Deltas_vs_M12_Cor_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+  facet_grid(Origin ~ ., scales = "free_y", space = "free_y") +
+  # geom_text(aes(label = round(Correlation, 2)), size = 3) +
+  geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
+  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("_", " ", x)
+    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
+    x }, expand = c(0,0)) +
+  labs(title = "Correlations between glycan deltas and month 12 marker values", x = NULL, y = NULL,
+       caption = paste0("Correlation coefficient used: <b>Spearman</b> 
+       <br>P value: <b>Not adjusted</b>")) +
+  theme_minimal(base_size = 12) +
+  theme(strip.placement = "outside",
+        strip.text.y.right = element_text(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
+        axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+        panel.grid  = element_blank(), 
+        panel.spacing = unit(1, "lines"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+        plot.title = element_markdown(face = "bold"))
+
+n_markers <- Glycan_Deltas_vs_M12_Cor_Sign %>% 
+    distinct(Marker) %>% 
+    nrow()
+
+plot_height <- max(n_markers * 0.3, 4)
+
+ggsave(Main_plot,
+       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Month_12_sign_only.jpeg",
+       width = 15, height = plot_height, dpi = 300)
 ```
 
