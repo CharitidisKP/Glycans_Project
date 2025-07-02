@@ -841,3 +841,57 @@ plot_height <- max(n_markers * 0.3, 4)
 #        width = 15, height = plot_height, dpi = 300)
 ```
 
+```{r Figure 5 - Prepare dataframes for regressions}
+
+Glycan_Hist <- read_xlsx("~/SLE/Glycans/Data/Glycan_Outcomes.xlsx") %>% 
+  filter(ID %in% Dataframes_Final$ID) %>% 
+  mutate(across(starts_with("Histological"), 
+                ~ na_if(.x, "NA") %>% 
+                  as.numeric())) %>% 
+  pivot_longer(cols = -c("ID"), names_to = "Outcome", values_to = "Value_Hist") %>% 
+  mutate(Outcome = str_replace_all(Outcome, "\\s*-\\s*", "_"))
+
+Glycans_Data <- Dataframes_Final %>% 
+  pivot_wider(id_cols = c(ID, Origin, Marker), names_from = Time_point, values_from = Value) %>% 
+  mutate(Delta = T12 - T0, 
+         Log2FC = log2(T12/T0))
+
+Models_DF <- Glycans_Data %>% 
+  inner_join(Glycan_Hist, by = "ID", relationship = "many-to-many")
+
+
+
+```
+
+```{r Non penalised regression}
+
+Reg_Results_Basic <- Models_DF %>% 
+  group_by(Marker, Outcome) %>% 
+  nest() %>%
+  mutate(fit_T0 = map(data, ~ glm(Value_Hist ~ T0, data = .x, family = "binomial")), 
+         fit_T12 = map(data, ~ glm(Value_Hist ~ T12, data = .x, family = "binomial")), 
+         fit_Delta = map(data, ~ glm(Value_Hist ~ Delta, data = .x, family = "binomial")), 
+         fit_Log2FC = map(data, ~ glm(Value_Hist ~ Log2FC, data = .x, family = "binomial")), 
+         
+         Tidy_T0 = map2(fit_T0, "T0", ~tidy(.x) %>% filter(term == .y)), 
+         Tidy_T12 = map2(fit_T12, "T12", ~tidy(.x) %>% filter(term == .y)), 
+         Tidy_Delta = map2(fit_Delta, "Delta", ~tidy(.x) %>% filter(term == .y)),
+         Tidy_Log2FC = map2(fit_Log2FC, "Log2FC", ~tidy(.x) %>% filter(term == .y))) %>% 
+  
+  select(Marker, Outcome, starts_with("Tidy_")) %>%
+  pivot_longer(cols = starts_with("Tidy_"), 
+               names_to = "Model", 
+               values_to = "Tidy", 
+               names_prefix = "Tidy_") %>% 
+  unnest(Tidy) %>% 
+  group_by(Model) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() %>% 
+  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+
+Reg_Results_Basic %>% 
+  filter(p.value < 0.05)
+
+```
+
+
