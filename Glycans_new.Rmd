@@ -276,11 +276,11 @@ Volcano_FDR <- ggplot(FCR_Values, aes(x = log2FC, y = FDR_log10)) +
                   max.overlaps = Inf, 
                   min.segment.length = 0)
 
-ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_nadj.jpeg"),
-       plot = Volcano_nadj, width = 10, height = 8, dpi = 300, device = "jpeg")
-
-ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR.jpeg"),
-       plot = Volcano_FDR, width = 10, height = 8, dpi = 300, device = "jpeg")
+# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_nadj.jpeg"),
+#        plot = Volcano_nadj, width = 10, height = 8, dpi = 300, device = "jpeg")
+# 
+# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR.jpeg"),
+#        plot = Volcano_FDR, width = 10, height = 8, dpi = 300, device = "jpeg")
 
 
 ```
@@ -452,9 +452,9 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
 #         legend.position = "right",
 #         legend.title.position = "bottom")
 
-ggsave(Main_plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
-       width = 15, height = 25, dpi = 300)
+# ggsave(Main_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
+#        width = 15, height = 25, dpi = 300)
 
 ```
 
@@ -540,11 +540,11 @@ Sub_Correlation_plots <- function(orig) {
 
   plot_height <- max(n_markers * 0.3, 4)
   
-  ggsave(Main_plot_current,
-       filename = paste0("~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_", orig,".jpeg"),
-       width = 15, 
-       height = plot_height,
-       dpi = 300)
+  # ggsave(Main_plot_current,
+  #      filename = paste0("~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_", orig,".jpeg"),
+  #      width = 15, 
+  #      height = plot_height,
+  #      dpi = 300)
 }
 
 plots_by_origin <- map(unique(Correlation_Results_Clean$Origin), Sub_Correlation_plots)
@@ -612,9 +612,9 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
 #         legend.position = "right",
 #         legend.title.position = "bottom")
 
-ggsave(Main_plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
-       width = 15, height = 25, dpi = 300)
+# ggsave(Main_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
+#        width = 15, height = 25, dpi = 300)
 
 ```
 
@@ -758,9 +758,9 @@ n_markers <- Correlations_Delta_Sign %>%
 
 plot_height <- max(n_markers * 0.3, 4)
 
-ggsave(Main_plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Delta_sign_only.jpeg",
-       width = 15, height = plot_height, dpi = 300)
+# ggsave(Main_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Delta_sign_only.jpeg",
+#        width = 15, height = plot_height, dpi = 300)
 
 
 
@@ -836,8 +836,8 @@ n_markers <- Glycan_Deltas_vs_M12_Cor_Sign %>%
 
 plot_height <- max(n_markers * 0.3, 4)
 
-ggsave(Main_plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Month_12_sign_only.jpeg",
-       width = 15, height = plot_height, dpi = 300)
+# ggsave(Main_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Month_12_sign_only.jpeg",
+#        width = 15, height = plot_height, dpi = 300)
 ```
 
