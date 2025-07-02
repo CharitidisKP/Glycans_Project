@@ -895,3 +895,181 @@ Reg_Results_Basic %>%
 ```
 
 
+```{r Firths penalised regression}
+
+Tidy_Firth <- function(fit, term) {
+  est <- coef(fit)[term]
+  se <- sqrt(diag(vcov(fit)))[term]
+  stat <- est/se
+  pval <- fit$prob[term]
+  
+  tibble(term = term, 
+          estimate = est, 
+          std.error = se,
+          statistic = stat, 
+          p.value = pval)
+}
+
+F_control <- logistf.control(maxit = 500, maxstep = 10)
+PL_control <- logistpl.control(maxit = 200, maxstep = 50)
+
+Reg_Results_Firth <- Models_DF %>% 
+  group_by(Marker, Outcome) %>% 
+  nest() %>%
+  mutate(fit_T0 = map(data, ~ logistf(Value_Hist ~ T0, data = .x, 
+                                      control = F_control, plcontrol = PL_control)), 
+         fit_T12 = map(data, ~ logistf(Value_Hist ~ T12, data = .x, 
+                                       control = F_control, plcontrol = PL_control)), 
+         fit_Delta = map(data, ~ logistf(Value_Hist ~ Delta, data = .x, 
+                                         control = F_control, plcontrol = PL_control)), 
+         fit_Log2FC = map(data, ~ logistf(Value_Hist ~ Log2FC, data = .x, 
+                                          control = F_control, plcontrol = PL_control)), 
+         
+         Tidy_T0 = map(fit_T0, ~ Tidy_Firth(.x, "T0")), 
+         Tidy_T12 = map(fit_T12, ~ Tidy_Firth(.x, "T12")), 
+         Tidy_Delta = map(fit_Delta, ~ Tidy_Firth(.x, "Delta")),
+         Tidy_Log2FC = map(fit_Log2FC, ~ Tidy_Firth(.x, "Log2FC"))) %>% 
+  
+  select(Marker, Outcome, starts_with("Tidy_")) %>%
+  pivot_longer(cols = starts_with("Tidy_"), 
+               names_to = "Model", 
+               values_to = "Tidy", 
+               names_prefix = "Tidy_") %>% 
+  unnest(Tidy) %>% 
+  group_by(Model) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() %>% 
+  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+
+Reg_Results_Firth %>% 
+  filter(p.value < 0.05)
+
+```
+
+```{r Lasso and Ridge regression}
+
+## Function to retrieve the values from the LR penalised regressions ##
+Tidy_LR <- function(cvfit, term) {
+  if (is.null(cvfit)) {
+    return(tibble(term = term,
+                  estimate = NA_real_,
+                  std.error = NA_real_,
+                  statistic = NA_real_,
+                  p.value = NA_real_))
+  }
+  
+  coef_mat <- as.matrix(coef(cvfit, s = "lambda.min"))
+  est <- coef_mat[term, ]
+  tibble(term = term,
+         estimate = as.numeric(est),
+         std.error = NA_real_,
+         statistic = NA_real_,
+         p.value = NA_real_)
+}
+
+## Lasso regression ##
+Reg_Results_Lasso <- Models_DF %>% 
+  group_by(Marker, Outcome) %>% 
+  nest() %>%
+  mutate(
+    fit_T0_Lasso = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      tab <- table(y)
+      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+      x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+    
+    fit_T12_Lasso = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      tab <- table(y)
+      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+      x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+    
+    fit_Delta_Lasso = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      tab <- table(y)
+      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+      x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+        
+    fit_Log2FC_Lasso = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      tab <- table(y)
+      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+      x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 1)}),                        
+    
+    Tidy_T0_Lasso = map(fit_T0_Lasso, ~ Tidy_LR(.x, "T0")), 
+    Tidy_T12_Lasso = map(fit_T12_Lasso, ~ Tidy_LR(.x, "T12")), 
+    Tidy_Delta_Lasso = map(fit_Delta_Lasso, ~ Tidy_LR(.x, "Delta")),
+    Tidy_Log2FC_Lasso = map(fit_Log2FC_Lasso, ~ Tidy_LR(.x, "Log2FC"))) %>% 
+  
+  select(Marker, Outcome, starts_with("Tidy_")) %>%
+  pivot_longer(cols = starts_with("Tidy_"), 
+               names_to = "Model", 
+               values_to = "Tidy", 
+               names_prefix = "Tidy_") %>% 
+  unnest(Tidy) %>% 
+  group_by(Model) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() %>% 
+  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+
+
+## Ridge regression ##
+Reg_Results_Ridge <- Models_DF %>% 
+  group_by(Marker, Outcome) %>% 
+  nest() %>%
+  mutate(
+    fit_T0_Ridge = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      if (length(unique(y)) < 2) return(NULL)
+      x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+    
+    fit_T12_Ridge = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      if (length(unique(y)) < 2) return(NULL)
+      x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+    
+    fit_Delta_Ridge = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      if (length(unique(y)) < 2) return(NULL)
+      x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+        
+    fit_Log2FC_Ridge = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      if (length(unique(y)) < 2) return(NULL)
+      x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 0)}),                         
+    
+    Tidy_T0_Ridge = map(fit_T0_Ridge, ~ Tidy_LR(.x, "T0")), 
+    Tidy_T12_Ridge = map(fit_T12_Ridge, ~ Tidy_LR(.x, "T12")), 
+    Tidy_Delta_Ridge = map(fit_Delta_Ridge, ~ Tidy_LR(.x, "Delta")),
+    Tidy_Log2FC_Ridge = map(fit_Log2FC_Ridge, ~ Tidy_LR(.x, "Log2FC"))) %>% 
+  
+  select(Marker, Outcome, starts_with("Tidy_")) %>%
+  pivot_longer(cols = starts_with("Tidy_"), 
+               names_to = "Model", 
+               values_to = "Tidy", 
+               names_prefix = "Tidy_") %>% 
+  unnest(Tidy) %>% 
+  group_by(Model) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() %>% 
+  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+
+
+```
+
