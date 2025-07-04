@@ -83,7 +83,7 @@ Reg_Results_Basic %>%
 
 Reg_Results_Basic_stats <- Reg_Results_Basic %>% 
   mutate(OR = exp(estimate), 
-         log2OR = log2(OR), 
+         log10OR = log10(OR), 
          CI_lower = estimate - 1.96 * std.error,
          CI_upper = estimate + 1.96 * std.error, 
          Significance = if_else(p.value < 0.05, "Significant", "Not Significant"))
@@ -280,8 +280,8 @@ Reg_Results_Ridge <- Models_DF %>%
 ```
 
 ```{r Model visualisation}
-
-Reg_Results_Firth_stats %>% 
+plot_GLM_results <- function(Dataframe_GLM, Model_Type) {
+Dataframe_GLM %>% 
   filter(Model != "T0") %>% 
   ggplot(., aes(x = log10OR, y = -log10(p.value))) +
   geom_point(aes(color = Outcome, alpha = Significance), size = 2) +
@@ -294,7 +294,8 @@ Reg_Results_Firth_stats %>%
   scale_x_continuous(limits = c(-10, 10),
                      breaks = seq(-10, 10, by = 5),
                      expand = c(0, 0)) +
-  labs(title = "Logistic Regression Results - Firth Penalised Model<br>Marker data vs Histological and Clinical Responses", 
+  labs(title = paste0("Logistic Regression Results - ", Model_Type," Model
+                      <br>Marker data vs Histological and Clinical Responses"), 
          x = "Odds Ratio (Log<sub>10</sub>)", 
          y = "P value (-Log<sub>10</sub>)") + 
   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
@@ -311,7 +312,16 @@ Reg_Results_Firth_stats %>%
         plot.caption = element_markdown(hjust = 0.9, vjust = 1),
         panel.grid.major = element_line(color = "grey90"),
         panel.grid.minor = element_blank())
+}
 
+Firth_GLM_Plot <- plot_GLM_results(Reg_Results_Firth_stats, "Firth Penalised")
+Normal_GLM_Plot <- plot_GLM_results(Reg_Results_Basic_stats, "Non Penalised")
+
+# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM.jpeg"),
+#        plot = Firth_GLM_Plot, width = 8, height = 12, dpi = 300, device = "jpeg")
+# 
+# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Normal_GLM.jpeg"),
+#        plot = Normal_GLM_Plot, width = 8, height = 12, dpi = 300, device = "jpeg")
 
 ```
 
