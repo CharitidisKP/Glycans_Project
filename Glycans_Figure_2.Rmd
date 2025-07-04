@@ -1,0 +1,215 @@
+```{r Libraries}
+
+## Load the libraries ##
+library(tidyverse)
+library(readxl)
+library(purrr)
+library(broom)
+library(ggtext)
+library(ggplot2)
+library(broom.helpers)
+library(writexl)
+
+```
+
+```{r Load the data}
+
+Marker_DF <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv") %>% 
+  rename(Marker_Value = "Value") 
+
+Comp_DF <- read_csv(file = "~/SLE/Glycans/Output_Data/Comparator_values_long.csv") %>% 
+  rename(Comp_Value = "Value") 
+
+Comparisons <- tribble(~Time_1, ~Time_2, ~Label, 
+                       "T0", "T0", "Baseline vs Baseline", 
+                       "T12", "T12", "Month 12 vs Month 12",
+                       "T0", "T12", "Baseline vs Month 12")
+
+Comparator_Levels <- c("AI", "CI", "eGFR", "UPCR", "SLEDAI-2K")
+
+```
+
+
+```{r Marker - Comparator correlations}
+
+Run_Cors <- function(Time_1, Time_2, Label) {
+  joined <- Marker_DF %>%
+    filter(Time_point == Time_1) %>%
+    select(ID, Marker, Marker_Value) %>%
+    inner_join(Comp_DF %>% 
+                 filter(Time_point == Time_2) %>% 
+                 select(ID, Comparator, Comp_Value),
+               by = "ID", relationship = "many-to-many")
+  
+  joined %>%
+    group_by(Marker, Comparator) %>%
+    summarize(broom::tidy(cor.test(Marker_Value, Comp_Value, 
+                                   method = "spearman", 
+                                   exact = FALSE)),
+              .groups = "drop") %>%
+    mutate(Comparison = Label)
+}
+
+Correlation_Results_Total <- Comparisons %>%
+  pmap_dfr(~ Run_Cors(..1, ..2, ..3)) 
+
+Correlation_Results_Clean <-  Correlation_Results_Total %>% 
+  group_by(Comparison) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr"), 
+         Significance = case_when(p.value < 0.05 ~ "*"), 
+         Origin = sub("_.*$", "", Marker), 
+         Comparator = factor(Comparator, levels = Comparator_Levels), 
+         Comparison = factor(Comparison, levels = c("Baseline vs Baseline", "Month 12 vs Month 12", "Baseline vs Month 12"))) %>% 
+  rename(Correlation = "estimate")
+  
+# write_csv(Correlation_Results_Clean, file = "~/SLE/Glycans/Output_Data/Glycan_Comp_Correlations.csv")
+
+```
+
+```{r Correlations visualisation}
+
+## Load the file in case you dont want to run the analysis ##
+Correlation_Results_Clean <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycan_Comp_Correlations.csv")
+
+## Visualise the heatmap ##
+Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, fill = Correlation)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+  facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y", 
+             labeller = labeller(Origin = function(x) 
+               ifelse(x == "Serum", "Serum<br>Proteome", x))) +
+  # geom_text(aes(label = round(Correlation, 2)), size = 3) +
+  geom_text(aes(label = Significance, vjust = 0, hjust = 0.5, fontface = "bold")) +
+  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("_", " ", x)
+    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
+    x }, expand = c(0,0)) +
+  labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL, 
+       caption = paste0("Correlation coefficient used: <b>Spearman</b> 
+         <br>P value: <b>Not adjusted</b>")) +
+  theme_minimal(base_size = 12) +
+  theme(strip.placement = "outside",
+        strip.text.y.right = element_markdown(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
+        axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
+        axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+        panel.grid  = element_blank(), 
+        panel.spacing = unit(1, "lines"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+        plot.title = element_text(face = "bold"))
+
+# ggsave(Main_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
+#        width = 15, height = 25, dpi = 300)
+
+```
+
+```{r Correlation plots by Origin}
+
+Correlation_Results_Clean_Sign <- Correlation_Results_Clean %>%
+  group_by(Marker) %>% 
+  filter(any(Significance == "*")) %>% 
+  ungroup()
+
+Sub_Correlation_plots <- function(orig) {
+
+  Cor_df_current <- Correlation_Results_Clean_Sign %>% 
+    filter(Origin == orig)
+
+  Current_Title <- if (orig == "Serum") {"Serum Proteome"} 
+  else { orig }
+  
+  n_markers <- Cor_df_current %>% 
+    distinct(Marker) %>% 
+    nrow()
+  
+  n_comp <- Cor_df_current %>% 
+    distinct(Comparator) %>% 
+    nrow()
+  
+  Main_plot_current <- ggplot(Cor_df_current, aes(x = Comparator, y = Marker, fill = Correlation)) +
+    geom_tile(color = "white", width = 1, height = 1) +
+    scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                         midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                         guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                                title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+    facet_wrap(~Comparison, nrow = 1) +
+    geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
+    scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+    scale_x_discrete(labels = function(x) {
+      x <- gsub("_", " ", x)
+      x <- gsub("Extra Renal", "Extra<br>Renal", x)
+      x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
+      x }, expand = c(0,0)) +
+    labs(title = paste0("Heatmap of Glycan Correlations<br>Origin: ", Current_Title), x = NULL, y = NULL,
+         caption = paste0("Correlation coefficient used: <b>Spearman</b> 
+         <br>P value: <b>Not adjusted</b>")) +
+    theme_minimal(base_size = 12) +
+    theme(strip.placement = "outside",
+          strip.text.y.left = element_blank(),
+          axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
+          axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+          panel.grid  = element_blank(), 
+          panel.spacing = unit(1, "lines"), 
+          plot.title = element_markdown(face = "bold", lineheight = 1.2),
+          aspect.ratio = n_markers/n_comp * 0.3,  
+          plot.caption.position = "plot", 
+          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+          plot.margin = margin(5, 5, 5, 5, "pt"))
+
+  plot_height <- max(n_markers * 0.3, 4)
+  
+  # ggsave(Main_plot_current,
+  #      filename = paste0("~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_", orig,".jpeg"),
+  #      width = 15, 
+  #      height = plot_height,
+  #      dpi = 300)
+}
+
+plots_by_origin <- map(unique(Correlation_Results_Clean$Origin), Sub_Correlation_plots)
+
+```
+
+```{r Correlations visualisation - Significant only}
+
+Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+  facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y", 
+             labeller = labeller(Origin = function(x) 
+               ifelse(x == "Serum", "Serum<br>Proteome", x))) +
+  # geom_text(aes(label = round(Correlation, 2)), size = 3) +
+  geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
+  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("_", " ", x)
+    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
+    x }, expand = c(0,0)) +
+  labs(title = "Heatmap of Glycan Correlations", x = NULL, y = NULL,
+       caption = paste0("Correlation coefficient used: <b>Spearman</b> 
+       <br>P value: <b>Not adjusted</b>")) +
+  theme_minimal(base_size = 12) +
+  theme(strip.placement = "outside",
+        strip.text.y.right = element_markdown(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
+        axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+        panel.grid  = element_blank(), 
+        panel.spacing = unit(1, "lines"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+        plot.title = element_text(face = "bold"))
+
+# ggsave(Main_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
+#        width = 15, height = 25, dpi = 300)
+
+```

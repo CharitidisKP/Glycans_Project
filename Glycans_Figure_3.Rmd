@@ -1,0 +1,176 @@
+```{r Libraries}
+
+## Load the libraries ##
+library(tidyverse)
+library(readxl)
+library(purrr)
+library(broom)
+library(ggtext)
+library(ggplot2)
+library(broom.helpers)
+library(writexl)
+
+```
+
+```{r Figure 3 preparation}
+
+Dataframes_Final <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv") 
+
+AI_CI_data <- read_xlsx("~/SLE/Glycans/Data/AI_CI_data.xlsx") %>% 
+  rename(ID = "Patients")
+
+AI_CI_Scores <- AI_CI_data %>% 
+  select(ID, Time_point, `NIH AI SCORE`, `NIH IC SCORE`)
+
+AI_CI_data_clean <- AI_CI_data %>% 
+  select(-c(`NIH AI SCORE`, `NIH IC SCORE`)) %>% 
+  pivot_longer(cols = -c(ID, Time_point), names_to = "Result", values_to = "Result_Value") %>% 
+  separate(col = Result, into = c("Category", "Result"), sep = " - ", extra = "merge") %>% 
+  mutate(Category = gsub(" ", "_", Category), 
+         Result = gsub("[ ,\\-]+", "_", Result),
+         Result_Value = na_if(Result_Value, "NA"),
+         Result_Value = if_else(is.na(Result_Value), 
+                         NA_real_, 
+                         if_else(Result_Value > 0, 1, 0))) 
+
+AI_CI_data_joint <- AI_CI_data_clean %>%
+  inner_join(Dataframes_Final, by = c("ID", "Time_point"), relationship = "many-to-many") 
+  
+NIH_Test_Results <- AI_CI_data_joint %>%
+  filter(!is.na(Result_Value)) %>%
+  group_by(Marker, Category, Result, Time_point) %>%
+  filter(n_distinct(Result_Value) == 2) %>%
+  summarize(NIH_Test = list(wilcox.test(Value ~ factor(Result_Value),
+                                        data = cur_data(),
+                                        exact = FALSE)),
+            .groups = "drop") %>%
+  mutate(Wilcox = map(NIH_Test, tidy)) %>%
+  unnest(Wilcox, names_sep = "_") %>%
+  group_by(Time_point) %>%
+  mutate(Wilcox_FDR = p.adjust(Wilcox_p.value, method = "fdr")) %>%
+  ungroup() 
+
+Markers_with_sign <- NIH_Test_Results %>%
+  group_by(Marker) %>%
+  filter(any(Wilcox_p.value < 0.05)) %>%
+  pull(Marker) %>%
+  unique()
+
+# write_csv(AI_CI_data_clean, file = "~/SLE/Glycans/Output_Data/Histology_data.csv")
+
+```
+
+
+```{r}
+
+NIH_Marker_DF <- Dataframes_Final %>% 
+  filter(Marker %in% Markers_with_sign)
+
+Comparisons <- tribble(~Time_1, ~Time_2, ~Label, 
+                       "T0", "T0", "Baseline vs Baseline", 
+                       "T12", "T12", "Month 12 vs Month 12",
+                       "T0", "T12", "Baseline vs Month 12")
+
+Run_Cor_Hist <- function(Time_1, Time_2, Label) {
+  joined <- NIH_Marker_DF %>%
+    filter(Time_point == Time_1) %>%
+    select(ID, Marker, Value) %>%
+    inner_join(AI_CI_data_clean %>% 
+                 filter(Time_point == Time_2) %>% 
+                 select(ID, Category, Result, Result_Value),
+               by = "ID", relationship = "many-to-many")
+  
+  joined %>%
+    group_by(Marker, Result) %>%
+    summarize(broom::tidy(cor.test(Value, Result_Value, 
+                                   method = "spearman", 
+                                   exact = FALSE)),
+              .groups = "drop") %>%
+    mutate(Comparison = Label)
+}
+
+NIH_Corr_Res_Sign_only <- Comparisons %>%
+  pmap_dfr(~ Run_Cor_Hist(..1, ..2, ..3)) 
+
+NIH_Corr_Res_Sign_only_Clean <- NIH_Corr_Res_Sign_only %>% 
+  group_by(Comparison) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr"), 
+         Significance = case_when(p.value < 0.05 ~ "*"), 
+         Origin = sub("_.*$", "", Marker), 
+         Comparison = factor(Comparison, levels = c("Baseline vs Baseline", "Month 12 vs Month 12", "Baseline vs Month 12"))) %>% 
+  rename(Correlation = "estimate") %>% 
+  inner_join(AI_CI_data_clean %>% select(Result, Category), by = c("Result"), relationship = "many-to-many") %>% 
+  group_by(Marker) %>% 
+  mutate(Origin = sub("_.*$", "", Marker), 
+         Marker = sub("^[^_]*_", "", Marker), 
+         Result = sub("_", "<br>", Result), 
+         Result = gsub("_", " ", Result), 
+         Category = factor(Category, levels = c("NIH_AI", "NIH_CI")),
+         Category = gsub("_", " ", Category)) 
+
+# write_csv(NIH_Corr_Res_Sign_only, file = "~/SLE/Glycans/Output_Data/Histology_Marker_Correlations.csv")
+
+```
+
+
+```{r}
+
+NIH_Corr_Res_Sign_only_Clean_Sign <- NIH_Corr_Res_Sign_only_Clean %>%
+  group_by(Marker) %>% 
+  filter(any(Significance == "*")) %>% 
+  ungroup()
+
+Sub_Correlation_plots_NIH <- function(orig) {
+
+  Cor_df_current <- NIH_Corr_Res_Sign_only_Clean_Sign %>% 
+    filter(Origin == orig) 
+  
+  Current_Title <- if (orig == "Serum") {"Serum Proteome"} 
+  else { orig }
+  
+  n_markers <- Cor_df_current %>% 
+    distinct(Marker) %>% 
+    nrow()
+  
+  n_comp <- Cor_df_current %>% 
+    distinct(Result) %>% 
+    nrow()
+    
+  Main_plot_current <- ggplot(Cor_df_current, aes(x = Result, y = Marker, fill = Correlation)) +
+    geom_tile(color = "white", width = 1, height = 1) +
+    scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                         midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                         guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                                title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+    facet_grid(~ Comparison, scales = "free", space = "free") +
+    scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
+    scale_y_discrete(expand = c(0, 0)) +
+    geom_text(aes(label = Significance, vjust = 0.7, hjust = 0.5, fontface = "bold")) +
+    labs(title = paste0("Heatmap of Marker - Histology correlations<br>Group: ", Current_Title), x = NULL, y = NULL, 
+         caption = paste0("Only Markers with significant Wilcoxon test results are shown
+         <br>Correlation coefficient used: <b>Spearman</b> 
+         <br>P value: <b>Not adjusted</b>")) +
+    theme_minimal(base_size = 12) +
+    theme(strip.placement = "outside",
+          strip.text.y.right = element_text(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
+          strip.text.x.top = element_text(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
+          axis.text.x = element_markdown(angle = 90, hjust = 1, vjust = 0.5, face = "bold", colour = "black"), 
+          axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
+          panel.grid  = element_blank(), 
+          panel.spacing = unit(1, "lines"), 
+          plot.caption.position = "plot", 
+          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+          plot.title = element_markdown(face = "bold", lineheight = 1.2))
+  
+  plot_height <- max(n_markers * 0.4, 4)
+  
+  # ggsave(Main_plot_current,
+  #      filename = paste0("~/SLE/Glycans/Plots_2/Figure_3_Correlations_NIH/Correlations_NIH_", orig,".jpeg"),
+  #      width = 15,
+  #      height = plot_height,
+  #      dpi = 300)
+}
+
+plots_by_origin <- map(unique(NIH_Corr_Res_Sign_only_Clean$Origin), Sub_Correlation_plots_NIH)
+
+```

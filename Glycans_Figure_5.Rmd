@@ -1,0 +1,317 @@
+```{r Libraries}
+
+## Load the libraries ##
+library(tidyverse)
+library(readxl)
+library(purrr)
+library(broom)
+library(broom.helpers)
+library(ggtext)
+library(ggplot2)
+library(logistf) ## Firth’s logistf() ##
+library(glmnet) ## Penalised regression ##
+
+```
+
+```{r Figure 5 - Prepare dataframes for regressions}
+
+Marker_DF <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv")
+
+Glycan_Hist <- read_xlsx("~/SLE/Glycans/Data/Glycan_Outcomes.xlsx") %>% 
+  filter(ID %in% Marker_DF$ID) %>% 
+  mutate(across(starts_with("Histological"), 
+                ~ na_if(.x, "NA") %>% 
+                  as.numeric())) %>% 
+  pivot_longer(cols = -c("ID"), names_to = "Outcome", values_to = "Value_Hist") %>% 
+  mutate(Outcome = str_replace_all(Outcome, "\\s*-\\s*", "_"))
+
+Histological <- Glycan_Hist %>% 
+  filter(str_starts(Outcome, "Histological_")) %>%
+  group_by(ID) %>%
+  summarize(Value_Hist = {
+    vals <- Value_Hist
+    u <- unique(vals[!is.na(vals)])
+    if (length(u)==1) u else NA_real_ },
+    .groups = "drop") %>%
+  mutate(Outcome = "Histological")
+
+Glycan_Hist_Clean <- Glycan_Hist %>% 
+  filter(Outcome == "Clinical") %>% 
+  bind_rows(Histological) %>% 
+  arrange(parse_number(ID), Outcome)
+
+Glycans_Data <- Marker_DF %>% 
+  pivot_wider(id_cols = c(ID, Origin, Marker), names_from = Time_point, values_from = Value) %>% 
+  mutate(Delta = T12 - T0, 
+         Log2FC = log2(T12/T0))
+
+Models_DF <- Glycans_Data %>% 
+  inner_join(Glycan_Hist_Clean, by = "ID", relationship = "many-to-many")
+
+# write_csv(Models_DF, file = "~/SLE/Glycans/Output_Data/Glycans_outcome_data_clean.csv")
+
+```
+
+```{r Non penalised regression}
+
+Reg_Results_Basic <- Models_DF %>% 
+  group_by(Marker, Outcome) %>% 
+  nest() %>%
+  mutate(fit_T0 = map(data, ~ glm(Value_Hist ~ T0, data = .x, family = "binomial")), 
+         fit_T12 = map(data, ~ glm(Value_Hist ~ T12, data = .x, family = "binomial")), 
+         fit_Delta = map(data, ~ glm(Value_Hist ~ Delta, data = .x, family = "binomial")), 
+         fit_Log2FC = map(data, ~ glm(Value_Hist ~ Log2FC, data = .x, family = "binomial")), 
+         
+         Tidy_T0 = map2(fit_T0, "T0", ~tidy(.x) %>% filter(term == .y)), 
+         Tidy_T12 = map2(fit_T12, "T12", ~tidy(.x) %>% filter(term == .y)), 
+         Tidy_Delta = map2(fit_Delta, "Delta", ~tidy(.x) %>% filter(term == .y)),
+         Tidy_Log2FC = map2(fit_Log2FC, "Log2FC", ~tidy(.x) %>% filter(term == .y))) %>% 
+  
+  select(Marker, Outcome, starts_with("Tidy_")) %>%
+  pivot_longer(cols = starts_with("Tidy_"), 
+               names_to = "Model", 
+               values_to = "Tidy", 
+               names_prefix = "Tidy_") %>% 
+  unnest(Tidy) %>% 
+  group_by(Model) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() %>% 
+  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+
+Reg_Results_Basic %>% 
+  filter(p.value < 0.05)
+
+Reg_Results_Basic_stats <- Reg_Results_Basic %>% 
+  mutate(OR = exp(estimate), 
+         log2OR = log2(OR), 
+         CI_lower = estimate - 1.96 * std.error,
+         CI_upper = estimate + 1.96 * std.error, 
+         Significance = if_else(p.value < 0.05, "Significant", "Not Significant"))
+
+# write_csv(Reg_Results_Basic, file = "~/SLE/Glycans/Output_Data/GLM_results_normal.csv")
+
+```
+
+```{r Firths penalised regression}
+
+Tidy_Firth <- function(fit, term) {
+  est <- coef(fit)[term]
+  se <- sqrt(diag(vcov(fit)))[term]
+  stat <- est/se
+  pval <- fit$prob[term]
+  
+  tibble(term = term, 
+          estimate = est, 
+          std.error = se,
+          statistic = stat, 
+          p.value = pval)
+}
+
+F_control <- logistf.control(maxit = 500, maxstep = 10)
+PL_control <- logistpl.control(maxit = 200, maxstep = 50)
+
+Reg_Results_Firth <- Models_DF %>% 
+  group_by(Marker, Outcome) %>% 
+  nest() %>%
+  mutate(fit_T0 = map(data, ~ logistf(Value_Hist ~ T0, data = .x, 
+                                      control = F_control, plcontrol = PL_control)), 
+         fit_T12 = map(data, ~ logistf(Value_Hist ~ T12, data = .x, 
+                                       control = F_control, plcontrol = PL_control)), 
+         fit_Delta = map(data, ~ logistf(Value_Hist ~ Delta, data = .x, 
+                                         control = F_control, plcontrol = PL_control)), 
+         fit_Log2FC = map(data, ~ logistf(Value_Hist ~ Log2FC, data = .x, 
+                                          control = F_control, plcontrol = PL_control)), 
+         
+         Tidy_T0 = map(fit_T0, ~ Tidy_Firth(.x, "T0")), 
+         Tidy_T12 = map(fit_T12, ~ Tidy_Firth(.x, "T12")), 
+         Tidy_Delta = map(fit_Delta, ~ Tidy_Firth(.x, "Delta")),
+         Tidy_Log2FC = map(fit_Log2FC, ~ Tidy_Firth(.x, "Log2FC"))) %>% 
+  
+  select(Marker, Outcome, starts_with("Tidy_")) %>%
+  pivot_longer(cols = starts_with("Tidy_"), 
+               names_to = "Model", 
+               values_to = "Tidy", 
+               names_prefix = "Tidy_") %>% 
+  unnest(Tidy) %>% 
+  group_by(Model) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() %>% 
+  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+
+Reg_Results_Firth_stats %>% 
+  filter(p.value < 0.05)
+
+Reg_Results_Firth_stats <- Reg_Results_Firth %>% 
+  mutate(OR = exp(estimate), 
+         log10OR = log10(OR), 
+         CI_lower = estimate - 1.96 * std.error,
+         CI_upper = estimate + 1.96 * std.error, 
+         Significance = if_else(p.value < 0.05, "Significant", "Not Significant"))
+
+# write_csv(Reg_Results_Firth, file = "~/SLE/Glycans/Output_Data/GLM_results_firth.csv")
+
+```
+
+```{r Lasso and Ridge regression}
+
+## Function to retrieve the values from the LR penalised regressions ##
+Tidy_LR <- function(cvfit, term) {
+  if (is.null(cvfit)) {
+    return(tibble(term = term,
+                  estimate = NA_real_,
+                  std.error = NA_real_,
+                  statistic = NA_real_,
+                  p.value = NA_real_))
+  }
+  
+  coef_mat <- as.matrix(coef(cvfit, s = "lambda.min"))
+  est <- coef_mat[term, ]
+  tibble(term = term,
+         estimate = as.numeric(est),
+         std.error = NA_real_,
+         statistic = NA_real_,
+         p.value = NA_real_)
+}
+
+## Lasso regression ##
+Reg_Results_Lasso <- Models_DF %>% 
+  group_by(Marker, Outcome) %>% 
+  nest() %>%
+  mutate(
+    fit_T0_Lasso = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      tab <- table(y)
+      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+      x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+    
+    fit_T12_Lasso = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      tab <- table(y)
+      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+      x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+    
+    fit_Delta_Lasso = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      tab <- table(y)
+      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+      x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+        
+    fit_Log2FC_Lasso = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      tab <- table(y)
+      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+      x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 1)}),                        
+    
+    Tidy_T0_Lasso = map(fit_T0_Lasso, ~ Tidy_LR(.x, "T0")), 
+    Tidy_T12_Lasso = map(fit_T12_Lasso, ~ Tidy_LR(.x, "T12")), 
+    Tidy_Delta_Lasso = map(fit_Delta_Lasso, ~ Tidy_LR(.x, "Delta")),
+    Tidy_Log2FC_Lasso = map(fit_Log2FC_Lasso, ~ Tidy_LR(.x, "Log2FC"))) %>% 
+  
+  select(Marker, Outcome, starts_with("Tidy_")) %>%
+  pivot_longer(cols = starts_with("Tidy_"), 
+               names_to = "Model", 
+               values_to = "Tidy", 
+               names_prefix = "Tidy_") %>% 
+  unnest(Tidy) %>% 
+  group_by(Model) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() %>% 
+  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+
+
+## Ridge regression ##
+Reg_Results_Ridge <- Models_DF %>% 
+  group_by(Marker, Outcome) %>% 
+  nest() %>%
+  mutate(
+    fit_T0_Ridge = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      if (length(unique(y)) < 2) return(NULL)
+      x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+    
+    fit_T12_Ridge = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      if (length(unique(y)) < 2) return(NULL)
+      x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+    
+    fit_Delta_Ridge = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      if (length(unique(y)) < 2) return(NULL)
+      x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+        
+    fit_Log2FC_Ridge = map(data, ~ {
+      mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
+      y <- model.response(mf)
+      if (length(unique(y)) < 2) return(NULL)
+      x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
+      cv.glmnet(x, y, family = "binomial", alpha = 0)}),                         
+    
+    Tidy_T0_Ridge = map(fit_T0_Ridge, ~ Tidy_LR(.x, "T0")), 
+    Tidy_T12_Ridge = map(fit_T12_Ridge, ~ Tidy_LR(.x, "T12")), 
+    Tidy_Delta_Ridge = map(fit_Delta_Ridge, ~ Tidy_LR(.x, "Delta")),
+    Tidy_Log2FC_Ridge = map(fit_Log2FC_Ridge, ~ Tidy_LR(.x, "Log2FC"))) %>% 
+  
+  select(Marker, Outcome, starts_with("Tidy_")) %>%
+  pivot_longer(cols = starts_with("Tidy_"), 
+               names_to = "Model", 
+               values_to = "Tidy", 
+               names_prefix = "Tidy_") %>% 
+  unnest(Tidy) %>% 
+  group_by(Model) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() %>% 
+  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+
+
+```
+
+```{r Model visualisation}
+
+Reg_Results_Firth_stats %>% 
+  filter(Model != "T0") %>% 
+  ggplot(., aes(x = log10OR, y = -log10(p.value))) +
+  geom_point(aes(color = Outcome, alpha = Significance), size = 2) +
+  scale_colour_manual(breaks = c("Clinical", "Histological"), 
+                      values = c("midnightblue", "coral1"), 
+                      name = "Response") +
+  scale_alpha_manual(values = c("Significant" = 1.0, 
+                                "Not Significant" = 0.2), 
+                                guide = "none") +
+  scale_x_continuous(limits = c(-10, 10),
+                     breaks = seq(-10, 10, by = 5),
+                     expand = c(0, 0)) +
+  labs(title = "Logistic Regression Results - Firth Penalised Model<br>Marker data vs Histological and Clinical Responses", 
+         x = "Odds Ratio (Log<sub>10</sub>)", 
+         y = "P value (-Log<sub>10</sub>)") + 
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
+  facet_wrap(~ Model, ncol = 1, scales = "free_x") +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
+        legend.title = element_markdown(face = "bold"), 
+        legend.text = element_markdown(face = "bold"), 
+        axis.title.x = element_markdown(face = "bold"), 
+        axis.title.y = element_markdown(face = "bold"), 
+        strip.text.x.top = element_markdown(hjust = 0.5, vjust = 0.5, face  = "bold"),
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+        panel.grid.major = element_line(color = "grey90"),
+        panel.grid.minor = element_blank())
+
+
+```
+

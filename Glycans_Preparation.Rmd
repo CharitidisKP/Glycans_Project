@@ -1,0 +1,172 @@
+```{r Libraries}
+
+## Load the libraries ##
+library(tidyverse)
+library(readxl)
+library(purrr)
+library(broom)
+library(ggtext)
+library(ggplot2)
+
+```
+
+```{r Load the data}
+
+AGP_Data <- read_xlsx("~/SLE/Glycans/Data/LN_AGP_glycopeptide-data.xlsx")
+C3_Data <- read_xlsx("~/SLE/Glycans/Data/LN_C3_glycopeptide_data.xlsx")
+Serum_Data <- read_xlsx("~/SLE/Glycans/Data/LN_serum_glycome_data.xlsx")
+Decreased_data <- read_xlsx("~/SLE/Glycans/Data/decreased.xlsx")
+Increased_data <- read_xlsx("~/SLE/Glycans/Data/increased.xlsx")
+IgG_FAB_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fab_data.xlsx")
+IgG_FC_Data <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_Fc_data.xlsx")
+IgG_Meta <- read_xlsx("~/SLE/Glycans/Data/LN_total_IgG_glycomedata.xlsx")
+Glycan_Outcomes <- read_xlsx("~/SLE/Glycans/Data/Glycans_Outcomes.xlsx")
+
+```
+
+```{r Prep slightly}
+
+Comparators <- c("AI", "CI", "S-creatinine", "eGFR", "UPCR", "albumin", "total", "extra-renal", "Renal Impairment", "Clinical")
+
+Select_Comparators <- c("AI", "CI", "eGFR", "UPCR", "total")
+
+Comparator_Levels <- c("AI", "CI", "eGFR", "UPCR", "SLEDAI-2K")
+
+# Renal_Impairment = `Renal Impairment`,
+#          Extra_Renal = `extra-renal`,
+#          S_creatinine = `S-creatinine`, 
+#          Clinical_Response = Clinical, 
+
+Comparator_Values <- Increased_data %>%
+  rename(ID = `Patient number`, Time_point = `Time point`) %>%
+  select(ID, Time_point, any_of(Select_Comparators)) %>%
+  rename('SLEDAI-2K' = total) %>%
+  select(ID, Time_point, everything()) %>%
+  mutate(across(.cols = -c(ID, Time_point), .fns = as.numeric))
+
+Comparator_Values_Long <- Comparator_Values %>% 
+  pivot_longer(cols = -c(ID, Time_point), names_to = "Comparator", values_to = "Value") %>% 
+  mutate(Comparator = factor(Comparator, levels = Comparator_Levels))
+
+# write_csv(Comparator_Values, file = "~/SLE/Glycans/Output_Data/Comparator_values.csv")
+# write_csv(Comparator_Values_Long, file = "~/SLE/Glycans/Output_Data/Comparator_values_long.csv")
+
+```
+
+```{r Make dtaaframes long}
+
+Dataframes <- list(AGP = AGP_Data, 
+                   C3 = C3_Data, 
+                   Serum = Serum_Data,
+                   Fab = IgG_FAB_Data, 
+                   Fc = IgG_FC_Data, 
+                   IgG = IgG_Meta)
+
+Process_DFs <- function(df){
+  df %>% 
+    select(-c(Sample, `ID_St Luc`)) %>% 
+    rename(ID = `Patient number`, Time_point = `Time point`) %>% 
+    mutate(across(.cols = -c(ID, Time_point), .fns = as.numeric)) %>% 
+    pivot_longer(cols = -c(ID, Time_point), names_to = "Marker", values_to  = "Value")
+}
+
+Long_Dataframes <- map(Dataframes, Process_DFs)
+
+```
+
+```{r Calculate the log2FC ratios}
+
+FCR_list <- imap(Long_Dataframes, ~ {
+  df <- .x
+  prefix <- .y
+  
+  df %>% 
+    pivot_wider(names_from = Time_point, values_from = Value) %>% 
+    group_by(Marker) %>% 
+    summarise(mean_T0 = mean(T0, na.rm = TRUE), 
+              mean_T12 = mean(T12, na.rm = TRUE)) %>%  
+    mutate(log2FC = log2(mean_T12/mean_T0), 
+           Marker = paste0(prefix, "_", Marker),
+           Origin = prefix) %>% 
+    select(Origin, Marker, everything())
+})
+
+FCR_Values <- bind_rows(FCR_list)
+
+# write_csv(FCR_Values, file = "~/SLE/Glycans/Output_Data/Glycans_logfc.csv")
+
+```
+
+```{r Get the direction of each marker}
+
+Directions_List <- imap(Long_Dataframes, ~ {
+  df <- .x
+  prefix <- .y
+  
+  df %>% 
+    mutate(Marker_Timepoint = paste0(Marker, Time_point)) %>%
+    group_by(Marker_Timepoint) %>%
+    summarise(Mean = mean(Value, na.rm = TRUE), .groups = "drop") %>%
+    extract(col = Marker_Timepoint, 
+          into = c("Marker", "Timepoint"), 
+          regex = "(.+)(T0|T12)$") %>% 
+    pivot_wider(names_from = "Timepoint", values_from = "Mean") %>% 
+    mutate(Direction = case_when(T12 > T0 ~ "Increase", 
+                                 T12 < T0 ~ "Decrease", 
+                                 TRUE ~ NA), 
+           Marker = paste0(prefix, "_", Marker),
+           Origin = prefix) %>% 
+    select(Marker, Direction, Origin)
+})
+
+Directions <- bind_rows(Directions_List)
+
+```
+
+```{r Perform the tests}
+
+Paired_Tests <- function(df){ df %>% 
+  pivot_wider(names_from = "Time_point", values_from = "Value", names_prefix = "Value_") %>% 
+  group_by(Marker) %>% 
+  summarise(Pairs = n_distinct(ID),
+            Test = list(wilcox.test(Value_T12, 
+                                    Value_T0, 
+                                    paired = TRUE, 
+                                    exact = FALSE)), 
+                        .groups = "drop") %>% 
+  mutate(Results = map(Test, broom::tidy)) %>% 
+  unnest(Results) %>% 
+  select(Marker, Pairs, statistic, p.value, method) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr"))
+}
+
+Test_Results <- imap(Long_Dataframes, ~Paired_Tests(.x) %>% 
+                       mutate(Marker = paste0(.y, "_", Marker)))
+
+Test_Results <- bind_rows(Test_Results, .id = "Origin")
+
+# write_csv(Test_Results, file = "~/SLE/Glycans/Output_Data/Glycans_test_results.csv")
+
+```
+
+```{r Combine the direction with the tests}
+
+Results_Total <- Test_Results %>% inner_join(Directions, by = c("Origin", "Marker"))
+
+Dataframes_Final <- imap(
+  Long_Dataframes, ~ .x %>% 
+      mutate(Marker = paste0(.y, "_", Marker), 
+             Origin = .y)) %>% 
+  bind_rows(., .id = "Origin") %>% 
+  select(ID, Origin, everything())
+
+Results_Sign <- Results_Total %>% 
+  filter(p.value < 0.05)
+
+Dataframes_Final_Sign <- Dataframes_Final %>% 
+  filter(Marker %in% Results_Sign$Marker)
+
+# write_csv(Dataframes_Final, file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv")
+# write_csv(Dataframes_Final_Sign, file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_sign.csv")
+
+```
