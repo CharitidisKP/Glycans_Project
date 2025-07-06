@@ -318,14 +318,14 @@ Dataframe_GLM %>%
         panel.grid.minor = element_blank())
 }
 
-Firth_GLM_Plot <- plot_GLM_results(Reg_Results_Firth_stats, "Firth Penalised")
-Normal_GLM_Plot <- plot_GLM_results(Reg_Results_Basic_stats, "Non Penalised")
+Firth_GLM_Plot <- plot_GLM_results(Reg_Results_Firth_stats, "Firth's penalised")
+Normal_GLM_Plot <- plot_GLM_results(Reg_Results_Basic_stats, "non penalised")
 
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM.jpeg"),
 #        plot = Firth_GLM_Plot, width = 30, height = 10, dpi = 300, device = "jpeg")
 # 
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Normal_GLM.jpeg"),
-#        plot = Normal_GLM_Plot, width = 8, height = 12, dpi = 300, device = "jpeg")
+#        plot = Normal_GLM_Plot,width = 30, height = 10, dpi = 300, device = "jpeg")
 
 ```
 
