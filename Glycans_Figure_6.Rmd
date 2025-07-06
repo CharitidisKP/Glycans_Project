@@ -1,0 +1,50 @@
+```{r}
+
+library(survival)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
+
+#------------
+data(veteran)
+head(veteran)
+
+```
+
+
+```{r}
+Patients <- read_csv("~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv") %>% 
+  select(ID) %>% 
+  distinct()
+
+Survival_Dataframe <- read_xlsx("~/SLE/Glycans/Data/Survival_Data.xlsx") %>% 
+  mutate(Biopsy_Date = dmy(Date_Biopsy), 
+         imp_date = case_when(`Renal Impairment` %in% c("0","1", NA) ~ NA_character_, TRUE ~ `Renal Impairment`),
+         imp_date = dmy(imp_date))
+
+Survival_Data <- Survival_Dataframe %>% group_by(Patients) %>% 
+    summarise(Start = Biopsy_Date[Timing_Biopsy == "T0"], 
+              Last = Biopsy_Date[Timing_Biopsy == "T12"], 
+              Event_Date = imp_date %>% 
+                na.omit() %>% 
+                first(),
+              Event = if_else(!is.na(Event_Date) & Event_Date <= Last, 1L, 0L),
+              End = if_else(Event == 1L, Event_Date, Last),
+              Time = as.numeric(difftime(End, Start, units = "days"))) %>% 
+    ungroup()
+
+```
+
+
+```{r}
+
+km <- with(Survival_Data, Surv(Time, Event))
+
+km_fit <- survfit(Surv(Time, Event) ~ 1, data = Survival_Data)
+
+summary(km_fit, times = c(1,30,60,90*(1:10)))
+autoplot(km_fit)
+
+```
+
