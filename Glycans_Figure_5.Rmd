@@ -325,3 +325,26 @@ Normal_GLM_Plot <- plot_GLM_results(Reg_Results_Basic_stats, "Non Penalised")
 
 ```
 
+```{r}
+
+Sign_Markers <- Reg_Results_Firth_stats %>% 
+  filter(Model != "T0") %>% 
+  filter(p.value < 0.05) %>% 
+  group_by(Marker) %>%
+  summarize(
+    clinical_sig   = any(Outcome == "Clinical"),
+    histo_sig      = any(Outcome == "Histological"),
+    .groups = "drop"
+  ) %>%
+  
+  # 3) keep only those with both TRUE
+  filter(clinical_sig & histo_sig) %>% 
+  select(Marker) %>% pull()
+
+Reg_Results_Firth_stats %>% 
+  filter(Model != "T0") %>% 
+  filter(Marker %in% Sign_Markers) %>% 
+  select(Marker, Outcome) %>% unique()
+
+```
+
