@@ -286,6 +286,7 @@ Reg_Results_Firth_stats <- Reg_Results_Firth %>%
 plot_GLM_results <- function(Dataframe_GLM, Model_Type) {
 Dataframe_GLM %>% 
   filter(Model != "T0") %>% 
+  mutate(Model = sub("Log2FC", "Log<sub>2</sub>FC", Model)) %>% 
   ggplot(., aes(x = log10OR, y = -log10(p.value))) +
   geom_point(aes(color = Outcome, alpha = Significance), size = 2) +
   scale_colour_manual(breaks = c("Clinical", "Histological"), 
@@ -297,8 +298,8 @@ Dataframe_GLM %>%
   scale_x_continuous(limits = c(-10, 10),
                      breaks = seq(-10, 10, by = 5),
                      expand = expansion(mult = c(0.05, 0.05))) +
-  labs(title = paste0("Logistic Regression Results - ", Model_Type," Model
-                      <br>Marker data vs Histological and Clinical Responses"), 
+  labs(title = paste0("Logistic regression results - ", Model_Type," model
+                      <br>Marker data vs histological and clinical responses"), 
          x = "Odds Ratio (Log<sub>10</sub>)", 
          y = "P value (-Log<sub>10</sub>)") + 
   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
@@ -357,12 +358,13 @@ Double_Sign_Markers <- Reg_Results_Firth_stats %>%
 plot_GLM_results <- function(Dataframe_GLM, Model_Type, Double_Sign_Markers) {
 DF_Plot <- Dataframe_GLM %>% 
     filter(Model != "T0") %>% 
+    mutate(Model = sub("Log2FC", "Log<sub>2</sub>FC", Model)) %>% 
     mutate(Highlight = if_else(Marker %in% Double_Sign_Markers, 
                                "Present in both models", 
                                "Not present in both models"), 
            Label = gsub("_", " ", Marker))
   
-    ggplot(DF_Plot, aes(x = log10OR, y = -log10(p.value))) +
+    ggplot(DF_Plot, aes(x = log10(OR), y = -log10(p.value))) +
     geom_point(aes(color = Highlight, alpha = Significance), size = 2) +
     geom_text_repel(data = DF_Plot %>% filter(Marker %in% Double_Sign_Markers, 
                                               Significance == "Significant"), 
@@ -384,8 +386,8 @@ DF_Plot <- Dataframe_GLM %>%
     scale_x_continuous(limits = c(-10, 10),
                        breaks = seq(-10, 10, by = 5),
                        expand = expansion(mult = c(0.05, 0.05))) +
-    labs(title = paste0("Logistic Regression Results - ", Model_Type," Model
-                        <br>Marker data vs Histological and Clinical Responses"), 
+  labs(title = paste0("Logistic regression results - ", Model_Type," model
+                      <br>Marker data vs histological and clinical responses"), 
            x = "Odds Ratio (Log<sub>10</sub>)", 
            y = "P value (-Log<sub>10</sub>)") + 
     geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
