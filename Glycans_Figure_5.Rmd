@@ -11,6 +11,9 @@ library(ggplot2)
 library(logistf) ## Firth’s logistf() ##
 library(glmnet) ## Penalised regression ##
 
+library(ggtext)
+library(ggrepel)
+
 ```
 
 ```{r Figure 5 - Prepare dataframes for regressions}
@@ -155,126 +158,126 @@ Reg_Results_Firth_stats <- Reg_Results_Firth %>%
 ```{r Lasso and Ridge regression}
 
 ## Function to retrieve the values from the LR penalised regressions ##
-Tidy_LR <- function(cvfit, term) {
-  if (is.null(cvfit)) {
-    return(tibble(term = term,
-                  estimate = NA_real_,
-                  std.error = NA_real_,
-                  statistic = NA_real_,
-                  p.value = NA_real_))
-  }
-  
-  coef_mat <- as.matrix(coef(cvfit, s = "lambda.min"))
-  est <- coef_mat[term, ]
-  tibble(term = term,
-         estimate = as.numeric(est),
-         std.error = NA_real_,
-         statistic = NA_real_,
-         p.value = NA_real_)
-}
-
-## Lasso regression ##
-Reg_Results_Lasso <- Models_DF %>% 
-  group_by(Marker, Outcome) %>% 
-  nest() %>%
-  mutate(
-    fit_T0_Lasso = map(data, ~ {
-      mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
-      y <- model.response(mf)
-      tab <- table(y)
-      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
-      x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
-      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
-    
-    fit_T12_Lasso = map(data, ~ {
-      mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
-      y <- model.response(mf)
-      tab <- table(y)
-      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
-      x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
-      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
-    
-    fit_Delta_Lasso = map(data, ~ {
-      mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
-      y <- model.response(mf)
-      tab <- table(y)
-      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
-      x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
-      cv.glmnet(x, y, family = "binomial", alpha = 1)}),
-        
-    fit_Log2FC_Lasso = map(data, ~ {
-      mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
-      y <- model.response(mf)
-      tab <- table(y)
-      if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
-      x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
-      cv.glmnet(x, y, family = "binomial", alpha = 1)}),                        
-    
-    Tidy_T0_Lasso = map(fit_T0_Lasso, ~ Tidy_LR(.x, "T0")), 
-    Tidy_T12_Lasso = map(fit_T12_Lasso, ~ Tidy_LR(.x, "T12")), 
-    Tidy_Delta_Lasso = map(fit_Delta_Lasso, ~ Tidy_LR(.x, "Delta")),
-    Tidy_Log2FC_Lasso = map(fit_Log2FC_Lasso, ~ Tidy_LR(.x, "Log2FC"))) %>% 
-  
-  select(Marker, Outcome, starts_with("Tidy_")) %>%
-  pivot_longer(cols = starts_with("Tidy_"), 
-               names_to = "Model", 
-               values_to = "Tidy", 
-               names_prefix = "Tidy_") %>% 
-  unnest(Tidy) %>% 
-  group_by(Model) %>% 
-  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
-  ungroup() %>% 
-  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
-
-
-## Ridge regression ##
-Reg_Results_Ridge <- Models_DF %>% 
-  group_by(Marker, Outcome) %>% 
-  nest() %>%
-  mutate(
-    fit_T0_Ridge = map(data, ~ {
-      mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
-      y <- model.response(mf)
-      if (length(unique(y)) < 2) return(NULL)
-      x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
-      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
-    
-    fit_T12_Ridge = map(data, ~ {
-      mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
-      y <- model.response(mf)
-      if (length(unique(y)) < 2) return(NULL)
-      x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
-      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
-    
-    fit_Delta_Ridge = map(data, ~ {
-      mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
-      y <- model.response(mf)
-      if (length(unique(y)) < 2) return(NULL)
-      x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
-      cv.glmnet(x, y, family = "binomial", alpha = 0)}),
-        
-    fit_Log2FC_Ridge = map(data, ~ {
-      mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
-      y <- model.response(mf)
-      if (length(unique(y)) < 2) return(NULL)
-      x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
-      cv.glmnet(x, y, family = "binomial", alpha = 0)}),                         
-    
-    Tidy_T0_Ridge = map(fit_T0_Ridge, ~ Tidy_LR(.x, "T0")), 
-    Tidy_T12_Ridge = map(fit_T12_Ridge, ~ Tidy_LR(.x, "T12")), 
-    Tidy_Delta_Ridge = map(fit_Delta_Ridge, ~ Tidy_LR(.x, "Delta")),
-    Tidy_Log2FC_Ridge = map(fit_Log2FC_Ridge, ~ Tidy_LR(.x, "Log2FC"))) %>% 
-  
-  select(Marker, Outcome, starts_with("Tidy_")) %>%
-  pivot_longer(cols = starts_with("Tidy_"), 
-               names_to = "Model", 
-               values_to = "Tidy", 
-               names_prefix = "Tidy_") %>% 
-  unnest(Tidy) %>% 
-  group_by(Model) %>% 
-  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
-  ungroup() %>% 
-  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+# Tidy_LR <- function(cvfit, term) {
+#   if (is.null(cvfit)) {
+#     return(tibble(term = term,
+#                   estimate = NA_real_,
+#                   std.error = NA_real_,
+#                   statistic = NA_real_,
+#                   p.value = NA_real_))
+#   }
+#   
+#   coef_mat <- as.matrix(coef(cvfit, s = "lambda.min"))
+#   est <- coef_mat[term, ]
+#   tibble(term = term,
+#          estimate = as.numeric(est),
+#          std.error = NA_real_,
+#          statistic = NA_real_,
+#          p.value = NA_real_)
+# }
+# 
+# ## Lasso regression ##
+# Reg_Results_Lasso <- Models_DF %>% 
+#   group_by(Marker, Outcome) %>% 
+#   nest() %>%
+#   mutate(
+#     fit_T0_Lasso = map(data, ~ {
+#       mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
+#       y <- model.response(mf)
+#       tab <- table(y)
+#       if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+#       x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
+#       cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+#     
+#     fit_T12_Lasso = map(data, ~ {
+#       mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
+#       y <- model.response(mf)
+#       tab <- table(y)
+#       if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+#       x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
+#       cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+#     
+#     fit_Delta_Lasso = map(data, ~ {
+#       mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
+#       y <- model.response(mf)
+#       tab <- table(y)
+#       if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+#       x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
+#       cv.glmnet(x, y, family = "binomial", alpha = 1)}),
+#         
+#     fit_Log2FC_Lasso = map(data, ~ {
+#       mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
+#       y <- model.response(mf)
+#       tab <- table(y)
+#       if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
+#       x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
+#       cv.glmnet(x, y, family = "binomial", alpha = 1)}),                        
+#     
+#     Tidy_T0_Lasso = map(fit_T0_Lasso, ~ Tidy_LR(.x, "T0")), 
+#     Tidy_T12_Lasso = map(fit_T12_Lasso, ~ Tidy_LR(.x, "T12")), 
+#     Tidy_Delta_Lasso = map(fit_Delta_Lasso, ~ Tidy_LR(.x, "Delta")),
+#     Tidy_Log2FC_Lasso = map(fit_Log2FC_Lasso, ~ Tidy_LR(.x, "Log2FC"))) %>% 
+#   
+#   select(Marker, Outcome, starts_with("Tidy_")) %>%
+#   pivot_longer(cols = starts_with("Tidy_"), 
+#                names_to = "Model", 
+#                values_to = "Tidy", 
+#                names_prefix = "Tidy_") %>% 
+#   unnest(Tidy) %>% 
+#   group_by(Model) %>% 
+#   mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+#   ungroup() %>% 
+#   select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+# 
+# 
+# ## Ridge regression ##
+# Reg_Results_Ridge <- Models_DF %>% 
+#   group_by(Marker, Outcome) %>% 
+#   nest() %>%
+#   mutate(
+#     fit_T0_Ridge = map(data, ~ {
+#       mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
+#       y <- model.response(mf)
+#       if (length(unique(y)) < 2) return(NULL)
+#       x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
+#       cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+#     
+#     fit_T12_Ridge = map(data, ~ {
+#       mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
+#       y <- model.response(mf)
+#       if (length(unique(y)) < 2) return(NULL)
+#       x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
+#       cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+#     
+#     fit_Delta_Ridge = map(data, ~ {
+#       mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
+#       y <- model.response(mf)
+#       if (length(unique(y)) < 2) return(NULL)
+#       x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
+#       cv.glmnet(x, y, family = "binomial", alpha = 0)}),
+#         
+#     fit_Log2FC_Ridge = map(data, ~ {
+#       mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
+#       y <- model.response(mf)
+#       if (length(unique(y)) < 2) return(NULL)
+#       x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
+#       cv.glmnet(x, y, family = "binomial", alpha = 0)}),                         
+#     
+#     Tidy_T0_Ridge = map(fit_T0_Ridge, ~ Tidy_LR(.x, "T0")), 
+#     Tidy_T12_Ridge = map(fit_T12_Ridge, ~ Tidy_LR(.x, "T12")), 
+#     Tidy_Delta_Ridge = map(fit_Delta_Ridge, ~ Tidy_LR(.x, "Delta")),
+#     Tidy_Log2FC_Ridge = map(fit_Log2FC_Ridge, ~ Tidy_LR(.x, "Log2FC"))) %>% 
+#   
+#   select(Marker, Outcome, starts_with("Tidy_")) %>%
+#   pivot_longer(cols = starts_with("Tidy_"), 
+#                names_to = "Model", 
+#                values_to = "Tidy", 
+#                names_prefix = "Tidy_") %>% 
+#   unnest(Tidy) %>% 
+#   group_by(Model) %>% 
+#   mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+#   ungroup() %>% 
+#   select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
 
 
 ```
@@ -293,14 +296,14 @@ Dataframe_GLM %>%
                                 guide = "none") +
   scale_x_continuous(limits = c(-10, 10),
                      breaks = seq(-10, 10, by = 5),
-                     expand = c(0, 0)) +
+                     expand = expansion(mult = c(0.05, 0.05))) +
   labs(title = paste0("Logistic Regression Results - ", Model_Type," Model
                       <br>Marker data vs Histological and Clinical Responses"), 
          x = "Odds Ratio (Log<sub>10</sub>)", 
          y = "P value (-Log<sub>10</sub>)") + 
   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
-  facet_wrap(~ Model, ncol = 1, scales = "free_x") +
+  facet_wrap(~ Model, ncol = 3, scales = "free_x") +
   theme_minimal(base_size = 14) +
   theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
         legend.title = element_markdown(face = "bold"), 
@@ -318,7 +321,7 @@ Firth_GLM_Plot <- plot_GLM_results(Reg_Results_Firth_stats, "Firth Penalised")
 Normal_GLM_Plot <- plot_GLM_results(Reg_Results_Basic_stats, "Non Penalised")
 
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM.jpeg"),
-#        plot = Firth_GLM_Plot, width = 8, height = 12, dpi = 300, device = "jpeg")
+#        plot = Firth_GLM_Plot, width = 30, height = 10, dpi = 300, device = "jpeg")
 # 
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Normal_GLM.jpeg"),
 #        plot = Normal_GLM_Plot, width = 8, height = 12, dpi = 300, device = "jpeg")
@@ -341,10 +344,71 @@ Sign_Markers <- Reg_Results_Firth_stats %>%
   filter(clinical_sig & histo_sig) %>% 
   select(Marker) %>% pull()
 
-Reg_Results_Firth_stats %>% 
-  filter(Model != "T0") %>% 
-  filter(Marker %in% Sign_Markers) %>% 
-  select(Marker, Outcome) %>% unique()
+Double_Sign_Markers <- Reg_Results_Firth_stats %>%
+  filter(Model != "T0",
+         Marker %in% Sign_Markers) %>%
+  pull(Marker)
+
+```
+
+
+```{r}
+
+plot_GLM_results <- function(Dataframe_GLM, Model_Type, Double_Sign_Markers) {
+DF_Plot <- Dataframe_GLM %>% 
+    filter(Model != "T0") %>% 
+    mutate(Highlight = if_else(Marker %in% Double_Sign_Markers, 
+                               "Present in both models", 
+                               "Not present in both models"), 
+           Label = gsub("_", " ", Marker))
+  
+    ggplot(DF_Plot, aes(x = log10OR, y = -log10(p.value))) +
+    geom_point(aes(color = Highlight, alpha = Significance), size = 2) +
+    geom_text_repel(data = DF_Plot %>% filter(Marker %in% Double_Sign_Markers, 
+                                              Significance == "Significant"), 
+                    aes(label = Label), 
+                    color = "black", 
+                    size = 3, 
+                    force = 2,
+                    box.padding = 0.3, 
+                    point.padding = 0.1, 
+                    segment.color = NA, 
+                    max.overlaps = Inf, 
+                    min.segment.length = 0) +
+    scale_colour_manual(values = c("Present in both models" = "coral1", 
+                                   "Not present in both models" = "grey"), 
+                        name = "Marker type") +
+    scale_alpha_manual(values = c("Significant" = 1.0, 
+                                  "Not Significant" = 0.2), 
+                                  guide = "none") +
+    scale_x_continuous(limits = c(-10, 10),
+                       breaks = seq(-10, 10, by = 5),
+                       expand = expansion(mult = c(0.05, 0.05))) +
+    labs(title = paste0("Logistic Regression Results - ", Model_Type," Model
+                        <br>Marker data vs Histological and Clinical Responses"), 
+           x = "Odds Ratio (Log<sub>10</sub>)", 
+           y = "P value (-Log<sub>10</sub>)") + 
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
+    geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
+    facet_wrap(Outcome ~ Model, ncol = 3, scales = "free_x") +
+    theme_minimal(base_size = 14) +
+    theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
+          legend.title = element_markdown(face = "bold"), 
+          legend.text = element_markdown(face = "bold"), 
+          axis.title.x = element_markdown(face = "bold"), 
+          axis.title.y = element_markdown(face = "bold"), 
+          strip.text.x.top = element_markdown(hjust = 0.5, vjust = 0.5, face  = "bold"),
+          plot.caption.position = "plot", 
+          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+          panel.grid.major = element_line(color = "grey90"),
+          panel.grid.minor = element_blank()) 
+          
+}
+
+Firth_GLM_Plot_Double_sign <- plot_GLM_results(Reg_Results_Firth_stats, "Firth Penalised", Double_Sign_Markers)
+
+ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_Double_sign.jpeg"),
+       plot = Firth_GLM_Plot_Double_sign, width = 22, height = 15, dpi = 300, device = "jpeg")
 
 ```
 

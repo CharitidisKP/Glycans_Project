@@ -1,14 +1,13 @@
 ```{r}
-
+library(tidyverse)
+library(ggplot2)
+library(readxl)
 library(survival)
 library(ranger)
 library(ggplot2)
 library(dplyr)
 library(ggfortify)
-
-#------------
-data(veteran)
-head(veteran)
+library(scales)
 
 ```
 
@@ -45,6 +44,49 @@ km_fit <- survfit(Surv(Time, Event) ~ 1, data = Survival_Data)
 
 summary(km_fit, times = c(1,30,60,90*(1:10)))
 autoplot(km_fit)
+
+```
+
+```{r Cox regression}
+
+cox <- coxph(Surv(Time, Event) ~ 1, data = Survival_Data)
+summary(cox)
+cox_fit <- survfit(cox)
+autoplot(cox_fit)
+
+```
+
+```{r}
+
+cox <- coxph(Surv(Time, Event) ~ 1, data = Survival_Data)
+km_fit <- survfit(cox)
+
+Survival_plot <- autoplot(km_fit, surv.geom = "step", 
+         censor.geom = "point", 
+         censor.shape = 3, 
+         censor.size = 2, 
+         censor.colour = "firebrick",
+         conf.int = TRUE, 
+         conf.int.fill = "royalblue", 
+         conf.int.colour = "midnightblue",
+         conf.int.style = "ribbon", 
+         conf.int.alpha = 0.2) +
+  theme_minimal(base_size = 14, base_family = "sans") +
+  labs(title = "Kaplan Meier Curve",
+       subtitle = "Renal Impairment probability over time",
+       x = "Days since baseline", 
+       y = "Renal Impairment probability") +
+  scale_y_continuous(labels = percent_format(accuracy = 1),
+                     limits = c(0, 1), 
+                     expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = "grey90"),
+        plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(size = 12))
+
+ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Survival_Plot_Basic.jpeg",
+       plot = Survival_plot, width = 10, height = 6, dpi = 300, device = "jpeg")
 
 ```
 

@@ -92,10 +92,8 @@ Main_plot <- ggplot(Correlations_Delta_Sign, aes(x = Comparator, y = Marker, fil
     x <- gsub("Extra Renal", "Extra<br>Renal", x)
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
-  labs(title = "Correlations between glycan and marker deltas", x = NULL, y = NULL,
-       caption = paste0("Correlation coefficient used: <b>Spearman</b> 
-       <br>P value: <b>Not adjusted</b>")) +
-  theme_minimal(base_size = 12) +
+  labs(title = "Correlations between Glycans and Clinical Indexes", x = NULL, y = NULL) +
+  theme_minimal(base_size = 12, base_family = "sans") +
   theme(strip.placement = "outside",
         strip.text.y.right = element_markdown(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
         axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
@@ -114,9 +112,9 @@ plot_height <- max(n_markers * 0.3, 4)
 
 # ggsave(Main_plot,
 #        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Delta_sign_only.jpeg",
-#        width = 15, height = plot_height, dpi = 300)
+#        width = 10, height = plot_height, dpi = 300)
 
-
+# caption = paste0("Correlation coefficient used: <b>Spearman</b>")
 
 ```
 
@@ -171,10 +169,8 @@ Main_plot <- ggplot(Glycan_Deltas_vs_M12_Cor_Sign, aes(x = Comparator, y = Marke
     x <- gsub("Extra Renal", "Extra<br>Renal", x)
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
-  labs(title = "Correlations between glycan deltas and month 12 marker values", x = NULL, y = NULL,
-       caption = paste0("Correlation coefficient used: <b>Spearman</b> 
-       <br>P value: <b>Not adjusted</b>")) +
-  theme_minimal(base_size = 12) +
+  labs(title = "Correlations between glycan deltas and month 12 marker values", x = NULL, y = NULL) +
+  theme_minimal(base_size = 12, base_family = "sans") +
   theme(strip.placement = "outside",
         strip.text.y.right = element_markdown(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
         axis.text.x = element_markdown(angle = 0, hjust = 0.5, face = "bold", colour = "black"), 
@@ -191,9 +187,11 @@ n_markers <- Glycan_Deltas_vs_M12_Cor_Sign %>%
 
 plot_height <- max(n_markers * 0.3, 4)
 
-# ggsave(Main_plot,
-#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Month_12_sign_only.jpeg",
-#        width = 15, height = plot_height, dpi = 300)
+ggsave(Main_plot,
+       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Month_12_sign_only.jpeg",
+       width = 10, height = plot_height, dpi = 300)
+
+# caption = paste0("Correlation coefficient used: <b>Spearman</b>")
 
 ```
 
@@ -259,10 +257,18 @@ Delta_Hist_Cor_Res <- rbind(Delta_Hist_Cor_T0, Delta_Hist_Cor_T12) %>%
 
 ```{r}
 
+NIH_mapping <- c(Cellular_crescents = "Cellular/Fibrocellular_crescents",
+                 Cellular_proliferation = "Endocapillary_hypercellularity",
+                 Fibrinoid_necrosis_karyorrhexis = "Fibrinoid_necrosis",
+                 Hyaline_thrombi_wire_loops = "Hyaline_deposits",
+                 Leukocyte_infiltration = "Neutrophiles/Karyorrhexis",
+                 Mononuclear_cell_infiltration = "Interstitial_inflammation")
+
 Delta_Hist_Cor_Res_Sign <- Delta_Hist_Cor_Res %>% 
   mutate(Category = gsub("_", " ", Category), 
+         Histology = recode(Histology, !!!NIH_mapping), 
          Histology = sub("_", "<br>", Histology), 
-         Histology = gsub("_", " ", Histology), 
+         Histology = gsub("/", " /<br>", Histology),
          Origin = gsub("Serum", "Serum<br>Proteome", Origin))
 
 Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
@@ -283,14 +289,12 @@ Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
     scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
     scale_y_discrete(expand = c(0, 0)) +
     geom_text(aes(label = Significance, vjust = 0.7, hjust = 0.5, fontface = "bold")) +
-    labs(title = paste0("Correlation Heatmap of Marker deltas vs Histology ", Title , " values"), x = NULL, y = NULL, 
-         caption = paste0("Correlation coefficient used: <b>Spearman</b> 
-         <br>P value: <b>Not adjusted</b>")) +
-    theme_minimal(base_size = 12) +
+    labs(title = paste0("Correlation Heatmap of Marker deltas vs Histology ", Title , " values"), x = NULL, y = NULL) +
+    theme_minimal(base_size = 12, base_family = "sans") +
     theme(strip.placement = "outside",
           strip.text.y.right = element_markdown(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
           strip.text.x.top = element_markdown(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
-          axis.text.x = element_markdown(angle = 90, hjust = 1, vjust = 0.5, face = "bold", colour = "black"), 
+          axis.text.x = element_markdown(size = 9, angle = 60, hjust = 1, vjust = 1, face = "bold", colour = "black"), 
           axis.text.y = element_markdown(size = 8, face = "bold", colour = "black"),
           panel.grid  = element_blank(), 
           panel.spacing = unit(1, "lines"), 
