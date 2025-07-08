@@ -1,4 +1,5 @@
-```{r}
+```{r Load the libraries}
+
 library(tidyverse)
 library(ggplot2)
 library(readxl)
@@ -8,11 +9,14 @@ library(ggplot2)
 library(dplyr)
 library(ggfortify)
 library(scales)
+library(broom)
+library(coxphf)
 
 ```
 
 
-```{r}
+```{r Load event times for renal impairment}
+
 Patients <- read_csv("~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv") %>% 
   select(ID) %>% 
   distinct()
@@ -31,28 +35,93 @@ Survival_Data <- Survival_Dataframe %>% group_by(Patients) %>%
               Event = if_else(!is.na(Event_Date) & Event_Date <= Last, 1L, 0L),
               End = if_else(Event == 1L, Event_Date, Last),
               Time = as.numeric(difftime(End, Start, units = "days"))) %>% 
-    ungroup()
+    ungroup() %>% 
+  rename(ID = Patients)
+
+
+  
+```
+
+```{r Load glycans and join}
+
+Marker_DF <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv")
+
+Glycans_Data <- Marker_DF %>% 
+  pivot_wider(id_cols = c(ID, Origin, Marker), names_from = Time_point, values_from = Value) %>% 
+  mutate(Delta = T12 - T0, 
+         Log2FC = log2(T12/T0))
+
+Glycans_T0 <- Marker_DF %>% 
+  filter(Time_point == "T0") %>% 
+  select(ID, Marker, Value) %>% 
+  pivot_wider(names_from = Marker, values_from = Value)
+
+Joint_T0 <- Survival_Data %>% 
+  inner_join(Glycans_T0, by = "ID")
+
+Markers <- Glycans_T0 %>% 
+  select(-ID) %>% 
+  colnames()
+  
+```
+
+
+
+```{r Prepare formulas and deal with NAs}
+
+Cox_formula_all <- reformulate(Markers, response = "Surv(Time, Event)")
+
+needed <- all.vars(Cox_formula_all)
+
+na_counts <- sapply(Joint_T0[needed], function(col) sum(is.na(col)))
+
+bad_rows <- which(!complete.cases(Joint_T0[needed]))
+Joint_T0[bad_rows, c("ID", needed)]
+
+## Since we have four samples with NA values we will replace them with the mdeian value for each marker ##
+## Too few samples too drop (19 total, so 4 is quite a large amount) ##
+
+Joint_imp <- Joint_T0 %>%
+  mutate(across(all_of(Markers), 
+                ~ replace_na(.x, median(.x, na.rm = TRUE))))
 
 ```
 
 
-```{r}
+```{r Perform the Cox regressions}
 
-km <- with(Survival_Data, Surv(Time, Event))
+Cox_Baseline <- coxph(Cox_formula_all, data = Joint_imp)
+# Cox_Baseline_Firth <- coxphf(Cox_formula_all, data = Joint_imp)
 
-km_fit <- survfit(Surv(Time, Event) ~ 1, data = Survival_Data)
+Univariate_Cox <- map_dfr(Markers, function(current_marker) {
+  
+  current_model <- coxph(reformulate(current_marker, response = "Surv(Time, Event)"), data = Joint_imp)
+  
+  tidy(current_model) %>% 
+    filter(term == current_marker) %>% 
+    select(Marker = term, estimate, p.value)
+  
+})
 
-summary(km_fit, times = c(1,30,60,90*(1:10)))
-autoplot(km_fit)
+Top_Markers_T0_strict <- Univariate_Cox %>% 
+  filter(p.value < 0.05) %>% pull(Marker)
 
-```
+Top_Markers_T0_lax <- Univariate_Cox %>% 
+  filter(p.value < 0.1) %>% pull(Marker)
 
-```{r Cox regression}
+Multi_Cox_Strict <- coxph(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
+                          data = Joint_imp)
 
-cox <- coxph(Surv(Time, Event) ~ 1, data = Survival_Data)
-summary(cox)
-cox_fit <- survfit(cox)
-autoplot(cox_fit)
+Multi_Cox_Lax <- coxph(reformulate(Top_Markers_T0_lax, response = "Surv(Time, Event)"), 
+                          data = Joint_imp)
+
+Multi_Cox_Firth_Strict <- coxphf(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
+                          data = Joint_imp, maxit = 200, maxstep = 0.2)
+
+Multi_Cox_Firth_Lax <- coxphf(reformulate(Top_Markers_T0_lax, response = "Surv(Time, Event)"), 
+                          data = Joint_imp, maxit = 200, maxstep = 0.2)
+
+
 
 ```
 
@@ -72,10 +141,10 @@ Survival_plot <- autoplot(km_fit, surv.geom = "step",
          conf.int.style = "ribbon", 
          conf.int.alpha = 0.2) +
   theme_minimal(base_size = 14, base_family = "sans") +
-  labs(title = "Kaplan Meier Curve",
-       subtitle = "Renal Impairment probability over time",
+  labs(title = "Kaplan Meier curve",
+       subtitle = "Renal impairment probability over time",
        x = "Days since baseline", 
-       y = "Renal Impairment probability") +
+       y = "Renal impairment probability") +
   scale_y_continuous(labels = percent_format(accuracy = 1),
                      limits = c(0, 1), 
                      expand = c(0, 0)) +
@@ -87,6 +156,37 @@ Survival_plot <- autoplot(km_fit, surv.geom = "step",
 
 ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Survival_Plot_Basic.jpeg",
        plot = Survival_plot, width = 10, height = 6, dpi = 300, device = "jpeg")
+
+```
+
+
+```{r}
+
+
+
+
+
+```
+
+```{r}
+
+
+Joint_long <- Survival_Data %>% 
+  select(ID, Event, Time) %>% 
+  inner_join(Glycans_Data, by = "ID")
+
+Joint_long %>% 
+  group_by(Marker) %>% 
+  nest() %>% 
+  ungroup() %>% 
+  crossing(Value_Variable = c("T0", "T12", "Delta", "Log2FC")) %>% 
+  mutate(Fit = map2(data, Value_Variable, ~ 
+                      coxph(reformulate(.y, response = "Surv(Time, Event)"), data = .x))) %>% 
+  mutate(Tidied = map2(Fit, Value_Variable, ~ broom::tidy(.x) %>% filter(term == .y))) %>% 
+  select(Marker, Value_Variable, Tidied) %>%
+  unnest(Tidied) %>% 
+  select(Marker, Value_Variable, estimate, std.error, statistic, p.value, conf.low, conf.high)
+
 
 ```
 
