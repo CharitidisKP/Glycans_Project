@@ -159,15 +159,6 @@ ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Survival_Plot_Basic.j
 
 ```
 
-
-```{r}
-
-
-
-
-
-```
-
 ```{r}
 
 
@@ -175,7 +166,7 @@ Joint_long <- Survival_Data %>%
   select(ID, Event, Time) %>% 
   inner_join(Glycans_Data, by = "ID")
 
-Joint_long %>% 
+Cox_Results_Uni <- Joint_long %>% 
   group_by(Marker) %>% 
   nest() %>% 
   ungroup() %>% 
@@ -183,9 +174,32 @@ Joint_long %>%
   mutate(Fit = map2(data, Value_Variable, ~ 
                       coxph(reformulate(.y, response = "Surv(Time, Event)"), data = .x))) %>% 
   mutate(Tidied = map2(Fit, Value_Variable, ~ broom::tidy(.x) %>% filter(term == .y))) %>% 
-  select(Marker, Value_Variable, Tidied) %>%
-  unnest(Tidied) %>% 
-  select(Marker, Value_Variable, estimate, std.error, statistic, p.value, conf.low, conf.high)
+  select(Marker, Tidied) %>%
+  unnest(Tidied) 
+  # select(Marker, Value_Variable, estimate, std.error, statistic, p.value, conf.low, conf.high)
+
+Cox_Sign_Markers <- Cox_Results_Uni %>% 
+  filter(p.value < 0.05) %>% 
+  group_by(term) %>% 
+  summarise(markers = list(unique(Marker)), .groups = "drop")
+
+Cox_Results_Multi <- Cox_Sign_Markers %>% 
+  mutate(
+    Data = map2(term, markers, ~ {
+      Joint_long %>% 
+        mutate(Value = .Data[[.x]]) %>% 
+        filter(Marker %in% .y) %>% 
+        select(ID, Time, Event, Marker, Value) %>% 
+        pivot_wider(names_from = Marker, values_from = Value)}),
+    Formula = map(markers, ~ reformulate(.x, response = "Surv(Time, Event)")),
+    Fit = map2(Formula, Data, ~ coxph(.x, Data = .y))) %>% 
+  select(term, markers, Fit)
+  
+  
+
+
+
+
 
 
 ```

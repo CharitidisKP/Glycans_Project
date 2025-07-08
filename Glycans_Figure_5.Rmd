@@ -463,9 +463,68 @@ Firth_Double_sign_M12 <- plot_GLM_results(Reg_Results_Firth_stats, "T12", "Firth
 
 ```
 
-```{r}
+```{r Volcano plot with T0 instead of log2FC}
 
+plot_GLM_results2 <- function(Dataframe_GLM, Model_Type) {
+  
+  DF_Plot_clean <- Dataframe_GLM %>% 
+    filter(Model != "Log2FC") %>% 
+    mutate(Label = gsub("_", " ", Marker), 
+           log_p = -log10(p.value), 
+           Model = factor(Model, levels = c("T0", "T12", "Delta")))  
+    
+  top_10_markers <- DF_Plot_clean %>% 
+    group_by(Model) %>% 
+    slice_min(order_by = p.value, n = 10, with_ties = FALSE) %>% 
+    ungroup()
+    
+    ggplot(DF_Plot_clean, aes(x = log10OR, y = -log10(p.value))) +
+    geom_point(aes(color = Outcome, alpha = Significance), size = 2) +
+    geom_text_repel(data = top_10_markers, 
+                    inherit.aes = FALSE, 
+                    aes(x = log10OR, y = log_p, label = Label),
+                    color = "black", 
+                    size = 3, 
+                    force = 2,
+                    box.padding = 0.3, 
+                    point.padding = 0.1, 
+                    segment.color = NA, 
+                    max.overlaps = Inf, 
+                    min.segment.length = 0) +  
+    scale_colour_manual(breaks = c("Clinical", "Histological"), 
+                        values = c("midnightblue", "coral1"), 
+                        name = "Response") +
+    scale_alpha_manual(values = c("Significant" = 1.0, 
+                                  "Not Significant" = 0.2), 
+                                  guide = "none") +
+    scale_x_continuous(limits = c(-10, 10),
+                       breaks = seq(-10, 10, by = 5),
+                       expand = expansion(mult = c(0.05, 0.05))) +
+    labs(title = paste0("Logistic regression results - ", Model_Type," model
+                        <br>Marker data vs histological and clinical responses"), 
+           x = "Odds Ratio (Log<sub>10</sub>)", 
+           y = "P value (-Log<sub>10</sub>)") + 
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
+    geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
+    facet_wrap(~ Model, ncol = 3, scales = "free_x") +
+    theme_minimal(base_size = 14) +
+    theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
+          legend.title = element_markdown(face = "bold"), 
+          legend.text = element_markdown(face = "bold"), 
+          axis.title.x = element_markdown(face = "bold"), 
+          axis.title.y = element_markdown(face = "bold"), 
+          strip.text.x.top = element_markdown(hjust = 0.5, vjust = 0.5, face  = "bold"),
+          plot.caption.position = "plot", 
+          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+          panel.grid.major = element_line(color = "grey90"),
+          panel.grid.minor = element_blank())
+}
 
+Firth_GLM_Plot2 <- plot_GLM_results2(Reg_Results_Firth_stats, "Firth's penalised")
+
+ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline.jpeg"),
+       plot = Firth_GLM_Plot2, width = 30, height = 10, dpi = 300, device = "jpeg")
 
 ```
+
 

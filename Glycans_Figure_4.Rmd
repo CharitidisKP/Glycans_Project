@@ -75,7 +75,7 @@ Correlations_Delta_Sign <- Correlations_Delta %>%
   filter(any(Significance == "*")) %>% 
   ungroup()
 
-Main_plot <- ggplot(Correlations_Delta_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
+Correlations_Delta_Sign_plot <- ggplot(Correlations_Delta_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
   scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
                        midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
@@ -112,9 +112,9 @@ n_markers <- Correlations_Delta_Sign %>%
 
 plot_height <- max(n_markers * 0.3, 4)
 
-ggsave(Main_plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Delta_sign_only.jpeg",
-       width = 10, height = plot_height, dpi = 300)
+# ggsave(Correlations_Delta_Sign_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Delta_sign_only.jpeg",
+#        width = 10, height = plot_height, dpi = 300)
 
 # caption = paste0("Correlation coefficient used: <b>Spearman</b>")
 
@@ -154,7 +154,7 @@ Glycan_Deltas_vs_M12_Cor_Sign <- Glycan_Deltas_vs_M12_Cor %>%
   filter(any(Significance == "*")) %>% 
   ungroup()
 
-Main_plot <- ggplot(Glycan_Deltas_vs_M12_Cor_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
+Glycan_Deltas_vs_M12_Cor_Sign_plot <- ggplot(Glycan_Deltas_vs_M12_Cor_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
   scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
                        midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
@@ -191,9 +191,9 @@ n_markers <- Glycan_Deltas_vs_M12_Cor_Sign %>%
 
 plot_height <- max(n_markers * 0.3, 4)
 
-ggsave(Main_plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Month_12_sign_only.jpeg",
-       width = 10, height = plot_height, dpi = 300)
+# ggsave(Glycan_Deltas_vs_M12_Cor_Sign_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Month_12_sign_only.jpeg",
+#        width = 10, height = plot_height, dpi = 300)
 
 # caption = paste0("Correlation coefficient used: <b>Spearman</b>")
 
@@ -273,7 +273,7 @@ Delta_Hist_Cor_Res_Sign <- Delta_Hist_Cor_Res %>%
          Histology = recode(Histology, !!!NIH_mapping), 
          Histology = sub("_", "<br>", Histology), 
          Histology = gsub("/", " /<br>", Histology),
-         Origin = gsub("Serum", "Serum<br>Proteome", Origin))
+         Origin = gsub("Serum", "Serum<br>proteome", Origin))
 
 Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
   
@@ -293,7 +293,7 @@ Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
     scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
     scale_y_discrete(expand = c(0, 0)) +
     geom_text(aes(label = Significance, vjust = 0.7, hjust = 0.5, fontface = "bold")) +
-    labs(title = paste0("Correlation heatmap of marker deltas vs clinical/histopathological features", Title , " values"), x = NULL, y = NULL) +
+    labs(title = paste0("Correlation heatmap of marker deltas vs clinical/histopathological features ", Title , " values"), x = NULL, y = NULL) +
     theme_minimal(base_size = 12, base_family = "sans") +
     theme(strip.placement = "outside",
           strip.text.y.right = element_markdown(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
@@ -316,13 +316,23 @@ Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
   
   Title <- gsub(" ", "_", Title)
   
-  ggsave(plot = this_plot, 
-       filename = paste0("~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Hist_", Title, ".jpeg"), 
-       width = 15, height = plot_height, dpi = 300, device = "jpeg")
+  # ggsave(plot = this_plot, 
+  #      filename = paste0("~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Hist_", Title, ".jpeg"), 
+  #      width = 15, height = plot_height, dpi = 300, device = "jpeg")
 }
 
-Delta_Hist_T0_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign, 0, "Baseline")
-Delta_Hist_T12_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign, 12, "Month 12")
+Delta_Hist_T0_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign, 0, "baseline")
+Delta_Hist_T12_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign, 12, "month 12")
+
+```
+
+
+```{r}
+
+Correlations_Delta_Sign_plot
+Glycan_Deltas_vs_M12_Cor_Sign_plot
+Delta_Hist_T0_cor_plot
+Delta_Hist_T12_cor_plot
 
 ```
 

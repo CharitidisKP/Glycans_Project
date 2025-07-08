@@ -107,9 +107,9 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
         plot.caption = element_markdown(hjust = 0.9, vjust = 1),
         plot.title = element_text(face = "bold"))
 
-ggsave(Main_plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
-       width = 15, height = 25, dpi = 300)
+# ggsave(Main_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_total.jpeg",
+#        width = 15, height = 25, dpi = 300)
 
 ## Removed from caption: <br>P value: <b>Not adjusted</b> ##
 
@@ -186,11 +186,11 @@ Sub_Correlation_plots <- function(orig) {
 
   plot_height <- max(n_markers * 0.3, 4)
   
-  ggsave(Main_plot_current,
-       filename = paste0("~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_", orig,".jpeg"),
-       width = 15,
-       height = 10,
-       dpi = 300)
+  # ggsave(Main_plot_current,
+  #      filename = paste0("~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_", orig,".jpeg"),
+  #      width = 15,
+  #      height = 10,
+  #      dpi = 300)
   
   Main_plot_current
 }
@@ -235,9 +235,9 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
         plot.caption = element_markdown(hjust = 0.9, vjust = 1),
         plot.title = element_text(face = "bold"))
 
-ggsave(Main_plot,
-       filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
-       width = 15, height = 25, dpi = 300)
+# ggsave(Main_plot,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant.jpeg",
+#        width = 15, height = 25, dpi = 300)
 
 ```
 
@@ -424,7 +424,7 @@ final_plot <- wrap_plots(
 final_plot_final <- final_plot & 
   theme(plot.tag = element_text(color = "black", face = "bold", size = 20))
 
-ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Cor_per_origin_combined.jpeg", 
+ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Cor_per_origin_combined.jpeg",
        plot = final_plot_final, width = 30, height = 18, dpi = 300)
 
 ```
