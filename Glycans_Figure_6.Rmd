@@ -46,68 +46,50 @@ Survival_Data <- Survival_Dataframe %>% group_by(Patients) %>%
 
 Marker_DF <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv")
 
-Glycans_Data <- Marker_DF %>% 
+Glycans_Data <- Marker_DF %>%
+  group_by(Time_point, Marker) %>%
+  
+  ## Since we have four samples with NA values we will replace them with the median value for each marker ##
+  ## Too few samples too drop (19 total, so 4 is quite a large amount) ##
+  
+  mutate(Marker_Median = median(Value, na.rm = TRUE), 
+         Value = if_else(is.na(Value), Marker_Median, Value)) %>% 
+  select(-Marker_Median) %>% 
+  ungroup() %>% 
   pivot_wider(id_cols = c(ID, Origin, Marker), names_from = Time_point, values_from = Value) %>% 
   mutate(Delta = T12 - T0, 
          Log2FC = log2(T12/T0))
 
-Glycans_T0 <- Marker_DF %>% 
-  filter(Time_point == "T0") %>% 
-  select(ID, Marker, Value) %>% 
-  pivot_wider(names_from = Marker, values_from = Value)
+Joint_DF <- Survival_Data %>% 
+  inner_join(Glycans_Data, by = "ID")
 
-Joint_T0 <- Survival_Data %>% 
-  inner_join(Glycans_T0, by = "ID")
+Markers <- Joint_DF %>% 
+  pull(Marker)
 
-Markers <- Glycans_T0 %>% 
-  select(-ID) %>% 
-  colnames()
-  
 ```
 
-
-
-```{r Prepare formulas and deal with NAs}
+```{r Perform the Cox regressions - Univariate}
 
 Cox_formula_all <- reformulate(Markers, response = "Surv(Time, Event)")
 
-needed <- all.vars(Cox_formula_all)
+Cox_Results_Uni_Total <- Joint_DF %>% 
+  select(ID, Time, Event, Marker, T0, T12, Delta) %>% 
+  pivot_longer(cols = -c(ID, Time, Event, Marker), names_to = "Comparison", values_to = "Value") %>% 
+  group_by(Comparison, Marker) %>% 
+  nest() %>% 
+  mutate(Fit = map(data, ~ coxph(Surv(Time, Event) ~ Value, data = .x)),
+         Tidy = map(Fit, ~ tidy(.x, exponentiate = TRUE, conf.int = TRUE))) %>%
+  unnest(Tidy) %>%
+  select(Comparison, Marker, estimate, std.error, statistic, p.value, conf.low, conf.high, hazard_ratio = estimate) %>%
+  arrange(Comparison, p.value) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() 
 
-na_counts <- sapply(Joint_T0[needed], function(col) sum(is.na(col)))
+Top_Markers_strict <- Cox_Results_Uni_Total %>% 
+  filter(p.value < 0.05) 
 
-bad_rows <- which(!complete.cases(Joint_T0[needed]))
-Joint_T0[bad_rows, c("ID", needed)]
-
-## Since we have four samples with NA values we will replace them with the mdeian value for each marker ##
-## Too few samples too drop (19 total, so 4 is quite a large amount) ##
-
-Joint_imp <- Joint_T0 %>%
-  mutate(across(all_of(Markers), 
-                ~ replace_na(.x, median(.x, na.rm = TRUE))))
-
-```
-
-
-```{r Perform the Cox regressions}
-
-Cox_Baseline <- coxph(Cox_formula_all, data = Joint_imp)
-# Cox_Baseline_Firth <- coxphf(Cox_formula_all, data = Joint_imp)
-
-Univariate_Cox <- map_dfr(Markers, function(current_marker) {
-  
-  current_model <- coxph(reformulate(current_marker, response = "Surv(Time, Event)"), data = Joint_imp)
-  
-  tidy(current_model) %>% 
-    filter(term == current_marker) %>% 
-    select(Marker = term, estimate, p.value)
-  
-})
-
-Top_Markers_T0_strict <- Univariate_Cox %>% 
-  filter(p.value < 0.05) %>% pull(Marker)
-
-Top_Markers_T0_lax <- Univariate_Cox %>% 
-  filter(p.value < 0.1) %>% pull(Marker)
+Top_Markers_lax <- Univariate_Cox %>% 
+  filter(p.value < 0.1) 
 
 Multi_Cox_Strict <- coxph(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
                           data = Joint_imp)
@@ -115,15 +97,79 @@ Multi_Cox_Strict <- coxph(reformulate(Top_Markers_T0_strict, response = "Surv(Ti
 Multi_Cox_Lax <- coxph(reformulate(Top_Markers_T0_lax, response = "Surv(Time, Event)"), 
                           data = Joint_imp)
 
-Multi_Cox_Firth_Strict <- coxphf(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
-                          data = Joint_imp, maxit = 200, maxstep = 0.2)
-
-Multi_Cox_Firth_Lax <- coxphf(reformulate(Top_Markers_T0_lax, response = "Surv(Time, Event)"), 
-                          data = Joint_imp, maxit = 200, maxstep = 0.2)
-
-
+# Multi_Cox_Firth_Strict <- coxphf(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
+#                           data = Joint_imp, maxit = 200, maxstep = 0.2)
+# 
+# Multi_Cox_Firth_Lax <- coxphf(reformulate(Top_Markers_T0_lax, response = "Surv(Time, Event)"), 
+#                           data = Joint_imp, maxit = 200, maxstep = 0.2)
 
 ```
+
+
+```{r Perform the Cox regressions - Multivariate}
+
+Top_Markers_strict <- Cox_Results_Uni_Total %>% 
+  filter(p.value < 0.05) 
+
+Top_Markers_lax <- Univariate_Cox %>% 
+  filter(p.value < 0.1) 
+
+Cox_Results_Multi_Total <- Joint_DF %>% 
+  select(ID, Time, Event, Marker, T0, T12, Delta) %>% 
+  pivot_longer(cols = -c(ID, Time, Event, Marker), names_to = "Comparison", values_to = "Value") %>% 
+  group_by(Comparison) %>% 
+  nest() %>% 
+  mutate(Fit = map(data, ~ coxph(Surv(Time, Event) ~ Value, data = .x)),
+         Tidy = map(Fit, ~ tidy(.x, exponentiate = TRUE, conf.int = TRUE))) %>%
+  unnest(Tidy) %>%
+  select(Comparison, Marker, estimate, std.error, statistic, p.value, conf.low, conf.high, hazard_ratio = estimate) %>%
+  arrange(Comparison, p.value) %>% 
+  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+  ungroup() 
+
+Run_multi_cox <- function(Top_Markers) {
+Joint_DF %>% 
+  select(ID, Time, Event, Marker, T0, T12, Delta) %>% 
+  pivot_longer(cols = -c(ID, Time, Event, Marker), names_to = "Comparison", values_to = "Value") %>% 
+  group_by(Comparison) %>% 
+  nest() %>% 
+  mutate(Markers = map(Comparison, ~ Top_Markers %>% 
+                         filter(Comparison == .x) %>% 
+                         pull(Marker)), 
+         
+         Data = map2(data, Markers, ~ .x %>% 
+                       filter(Marker %in% .y) %>% 
+                       select(ID, Time, Event, Marker, Value) %>% 
+                       pivot_wider(id_cols = c(ID, Time, Event), names_from = Marker, values_from = Value)), 
+         
+         Formula = map(Markers, ~ reformulate(.x, response = "Surv(Time, Event)")), 
+         
+         Fit = map2(Formula, Data, ~ coxph(.x, data = .y)), 
+         
+         Tidy = map(Fit, ~ tidy(.x, exponentiate = TRUE, conf.int = TRUE))) %>% 
+    unnest(Tidy) %>% 
+    select(Comparison, Marker = term, estimate, std.error, statistic, 
+           p.value, conf.low, conf.high, hazard_ratio = estimate) %>% 
+    group_by(Comparison) %>% 
+    mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
+    ungroup()
+    
+}
+
+Cox_Results_Multi_Total_strict <- Run_multi_cox(Top_Markers_strict)
+
+# Multi_Cox_Firth_Strict <- coxphf(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
+#                           data = Joint_imp, maxit = 200, maxstep = 0.2)
+
+```
+
+
+
+
+
+
+
+
 
 ```{r}
 
@@ -162,8 +208,8 @@ ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Survival_Plot_Basic.j
 ```{r}
 
 
-Joint_long <- Survival_Data %>% 
-  select(ID, Event, Time) %>% 
+Joint_long <- Joint_imp %>% 
+  select(ID, Event, Time, any_of(Glycans_Data$Marker)) %>% 
   inner_join(Glycans_Data, by = "ID")
 
 Cox_Results_Uni <- Joint_long %>% 
@@ -176,31 +222,86 @@ Cox_Results_Uni <- Joint_long %>%
   mutate(Tidied = map2(Fit, Value_Variable, ~ broom::tidy(.x) %>% filter(term == .y))) %>% 
   select(Marker, Tidied) %>%
   unnest(Tidied) 
-  # select(Marker, Value_Variable, estimate, std.error, statistic, p.value, conf.low, conf.high)
 
 Cox_Sign_Markers <- Cox_Results_Uni %>% 
   filter(p.value < 0.05) %>% 
   group_by(term) %>% 
-  summarise(markers = list(unique(Marker)), .groups = "drop")
+  summarise(markers = unique(Marker), .groups = "drop")
 
 Cox_Results_Multi <- Cox_Sign_Markers %>% 
-  mutate(
-    Data = map2(term, markers, ~ {
-      Joint_long %>% 
-        mutate(Value = .Data[[.x]]) %>% 
-        filter(Marker %in% .y) %>% 
-        select(ID, Time, Event, Marker, Value) %>% 
-        pivot_wider(names_from = Marker, values_from = Value)}),
+  filter(term %in% c("T0", "T12", "Delta")) %>%  
+  mutate(Data = map2(term, markers, ~ {
+    Joint_long %>%
+      filter(Marker %in% .y) %>%
+      select(ID, Time, Event, Marker, any_of(.x)) %>%
+      pivot_wider(id_cols = c(ID, Time, Event),
+                  names_from = Marker,
+                  values_from = .x)}),
     Formula = map(markers, ~ reformulate(.x, response = "Surv(Time, Event)")),
-    Fit = map2(Formula, Data, ~ coxph(.x, Data = .y))) %>% 
-  select(term, markers, Fit)
+    Fit = map2(Formula, Data, ~ coxph(.x, data = .y))) %>%
+  # select(term, markers, Fit) %>% 
+  mutate(Tidy = map(Fit, ~ tidy(.x, exponentiate = TRUE, conf.int = TRUE) %>% 
+                      rename(Model = term))) %>% 
+  unnest(Tidy)
+
+
+Test_1 <- Cox_Sign_Markers %>% 
+  filter(term == "Delta") %>% 
+  pull(markers)
+
+Delta_DF <- Joint_long %>% 
+  select(ID, Time, Event, Marker, Delta) %>% 
+  pivot_wider(id_cols = c(ID, Time, Event), names_from = Marker, values_from = Delta)
+
+coxph(reformulate(Test_1, response = "Surv(Time, Event)"), data = Delta_DF)
   
-  
+```
 
 
+```{r}
 
+X <- scale(model.matrix(Formula_2, data = Joint_imp)[, -1])
+
+cm2 <- cor_mat
+diag(cm2) <- NA
+which(abs(cm2) > 0.95, arr.ind=TRUE)
+
+Top_Markers_T0_strict_2 <- Top_Markers_T0_strict[! Top_Markers_T0_strict %in% c("Serum_S4", "Serum_GP38", "C3_CIIIGIRMN1N2H9")]
+Formula_2 <- reformulate(Top_Markers_T0_strict_2, response = "Surv(Time, Event)")
+
+fit_2 <- aareg(Formula_2, data = Joint_imp, nmin = 1)
+autoplot(fit_2)
+fit_2_cox <- coxph(Formula_2, data = Joint_imp)
+zph <- cox.zph(fit_2)
+
+```
+
+
+```{r}
 
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
