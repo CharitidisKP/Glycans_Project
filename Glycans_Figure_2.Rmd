@@ -407,8 +407,6 @@ final_plot <- wrap_plots(
   plot_annotation(
     title = "Heatmap of marker correlations compared to clicinal indices",
     tag_levels = "A",   
-    # tag_prefix = "[",        
-    # tag_suffix = "]", 
   theme = theme(
     plot.title = element_text(face = "bold", size = 23),
     plot.title.position = "plot", 
