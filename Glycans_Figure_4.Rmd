@@ -61,7 +61,8 @@ Correlations_Delta <- expand_grid(Marker = colnames(Glycan_Deltas),
          p.value = map_dbl(test, "p.value", )) %>%
   mutate(P_adjust = p.adjust(p.value, method = "BH")) %>% 
   select(-test) %>% 
-  mutate(Origin = sub("_.*$", "", Marker)) %>% 
+  mutate(Origin = sub("_.*$", "", Marker), 
+         Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum"))) %>% 
   rename(Correlation = "rho") %>% 
   mutate(Significance = case_when(p.value < 0.05 ~ "*"), 
          Comparator = factor(Comparator, levels = Comparator_Levels))
@@ -74,6 +75,8 @@ Correlations_Delta_Sign <- Correlations_Delta %>%
   group_by(Marker) %>% 
   filter(any(Significance == "*")) %>% 
   ungroup()
+
+# write_xlsx(Correlations_Delta, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Indices_Correlation.xlsx")
 
 Correlations_Delta_Sign_plot <- ggplot(Correlations_Delta_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
@@ -151,8 +154,11 @@ Glycan_Deltas_vs_M12_Cor <- expand_grid(Marker = colnames(Glycan_Deltas),
 
 Glycan_Deltas_vs_M12_Cor_Sign <- Glycan_Deltas_vs_M12_Cor %>%
   group_by(Marker) %>% 
+  mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum"))) %>% 
   filter(any(Significance == "*")) %>% 
   ungroup()
+
+write_xlsx(Glycan_Deltas_vs_M12_Cor, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Indices_T12_Correlation.xlsx")
 
 Glycan_Deltas_vs_M12_Cor_Sign_plot <- ggplot(Glycan_Deltas_vs_M12_Cor_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
@@ -273,7 +279,10 @@ Delta_Hist_Cor_Res_Sign <- Delta_Hist_Cor_Res %>%
          Histology = recode(Histology, !!!NIH_mapping), 
          Histology = sub("_", "<br>", Histology), 
          Histology = gsub("/", " /<br>", Histology),
-         Origin = gsub("Serum", "Serum<br>proteome", Origin))
+         Origin = gsub("Serum", "Serum<br>proteome", Origin), 
+         Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")))
+
+# write_xlsx(Delta_Hist_Cor_Res, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Hist_Correlation.xlsx")
 
 Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
   
@@ -314,11 +323,13 @@ Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
 
   plot_height <- max(n_markers * 0.4, 8)
   
-  Title <- gsub(" ", "_", Title)
-  
+  # Title <- gsub(" ", "_", Title)
+  # 
   # ggsave(plot = this_plot, 
   #      filename = paste0("~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Hist_", Title, ".jpeg"), 
   #      width = 15, height = plot_height, dpi = 300, device = "jpeg")
+  
+  this_plot
 }
 
 Delta_Hist_T0_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign, 0, "baseline")
@@ -329,10 +340,7 @@ Delta_Hist_T12_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign, 12, "mon
 
 ```{r}
 
-Correlations_Delta_Sign_plot
-Glycan_Deltas_vs_M12_Cor_Sign_plot
-Delta_Hist_T0_cor_plot
-Delta_Hist_T12_cor_plot
+
 
 ```
 
