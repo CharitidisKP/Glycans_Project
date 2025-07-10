@@ -11,9 +11,10 @@ library(ggfortify)
 library(scales)
 library(broom)
 library(coxphf)
+library(ggtext)
+library(timereg)
 
 ```
-
 
 ```{r Load event times for renal impairment}
 
@@ -38,8 +39,6 @@ Survival_Data <- Survival_Dataframe %>% group_by(Patients) %>%
     ungroup() %>% 
   rename(ID = Patients)
 
-
-  
 ```
 
 ```{r Load glycans and join}
@@ -64,7 +63,8 @@ Joint_DF <- Survival_Data %>%
   inner_join(Glycans_Data, by = "ID")
 
 Markers <- Joint_DF %>% 
-  pull(Marker)
+  distinct(Marker) %>% 
+  pull()
 
 ```
 
@@ -85,47 +85,19 @@ Cox_Results_Uni_Total <- Joint_DF %>%
   mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
   ungroup() 
 
-Top_Markers_strict <- Cox_Results_Uni_Total %>% 
-  filter(p.value < 0.05) 
-
-Top_Markers_lax <- Univariate_Cox %>% 
-  filter(p.value < 0.1) 
-
-Multi_Cox_Strict <- coxph(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
-                          data = Joint_imp)
-
-Multi_Cox_Lax <- coxph(reformulate(Top_Markers_T0_lax, response = "Surv(Time, Event)"), 
-                          data = Joint_imp)
-
 # Multi_Cox_Firth_Strict <- coxphf(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
 #                           data = Joint_imp, maxit = 200, maxstep = 0.2)
 # 
-# Multi_Cox_Firth_Lax <- coxphf(reformulate(Top_Markers_T0_lax, response = "Surv(Time, Event)"), 
-#                           data = Joint_imp, maxit = 200, maxstep = 0.2)
 
 ```
-
 
 ```{r Perform the Cox regressions - Multivariate}
 
 Top_Markers_strict <- Cox_Results_Uni_Total %>% 
   filter(p.value < 0.05) 
 
-Top_Markers_lax <- Univariate_Cox %>% 
+Top_Markers_lax <- Cox_Results_Uni_Total %>% 
   filter(p.value < 0.1) 
-
-Cox_Results_Multi_Total <- Joint_DF %>% 
-  select(ID, Time, Event, Marker, T0, T12, Delta) %>% 
-  pivot_longer(cols = -c(ID, Time, Event, Marker), names_to = "Comparison", values_to = "Value") %>% 
-  group_by(Comparison) %>% 
-  nest() %>% 
-  mutate(Fit = map(data, ~ coxph(Surv(Time, Event) ~ Value, data = .x)),
-         Tidy = map(Fit, ~ tidy(.x, exponentiate = TRUE, conf.int = TRUE))) %>%
-  unnest(Tidy) %>%
-  select(Comparison, Marker, estimate, std.error, statistic, p.value, conf.low, conf.high, hazard_ratio = estimate) %>%
-  arrange(Comparison, p.value) %>% 
-  mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
-  ungroup() 
 
 Run_multi_cox <- function(Top_Markers) {
 Joint_DF %>% 
@@ -163,15 +135,56 @@ Cox_Results_Multi_Total_strict <- Run_multi_cox(Top_Markers_strict)
 
 ```
 
+```{r Visualise normal Cox results}
 
+Plot_Cox_Results <- function(Plot, Type, Filter) {
+ Plot %>% 
+  separate(Marker, c("Origin", "Marker"), sep = "_", extra = "merge") %>% 
+  mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")), 
+         Origin = gsub("Serum", "Serum<br>proteome", Origin), 
+         Marker = if_else(p.value < 0.05, paste0("<span style='font-size:18px'>* </span>", Marker), Marker)) %>% 
+    { if (Filter) filter(., p.value < 0.05) else . } %>% 
+  ggplot(., aes(x = hazard_ratio, y = Marker, colour = Comparison)) +
+      geom_point(position = position_dodge(0.6), size = 3) +
+      geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
+                     position = position_dodge(0.6),
+                     height = 0.2) +
+    scale_color_manual(values = c(T0 = "cyan3", T12 = "coral1", Delta = "mediumspringgreen"), 
+                       name = "Glycan values tested for<br>the cox regression") +
+      scale_x_log10() +
+      facet_grid(Origin ~ ., scales = "free_y", space = "free_y") +
+      labs(title = paste0(Type, " Cox regression: Hazard ratios with 95% CI"), 
+           caption = paste0("Only markers which were significant in the univariate analysis shown"), 
+           x = "Hazard ratio") +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0, face = "bold"),
+            panel.grid.major.y = element_blank(), 
+            axis.title.y = element_blank(),
+            axis.text.y = element_markdown(face = "bold"),
+            axis.title.x = element_markdown(), 
+            axis.ticks.x = element_blank(), 
+            legend.text = element_markdown(size = 10), 
+            plot.caption = element_markdown(), 
+            strip.text.y.right = element_markdown(angle = 0, 
+                                                  hjust = 0.5, 
+                                                  vjust = 0.5, 
+                                                  face  = "bold"), 
+            legend.title = element_markdown(face = "bold"))
 
+}
 
+Cox_Uni_plot <- Plot_Cox_Results(Cox_Results_Uni_Total, "Univariate", Filter = TRUE)
+Cox_Multi_plot <- Plot_Cox_Results(Cox_Results_Multi_Total_strict, "Multivariate", Filter = FALSE)
 
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Cox_Uni_Sign.jpeg", 
+#        plot = Cox_Uni_plot, height = 10, width = 15, dpi = 300, device = "jpeg")
+# 
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Cox_Multi.jpeg", 
+#        plot = Cox_Multi_plot, height = 10, width = 15, dpi = 300, device = "jpeg")
 
+```
 
-
-
-```{r}
+```{r Kaplan meier plot}
 
 cox <- coxph(Surv(Time, Event) ~ 1, data = Survival_Data)
 km_fit <- survfit(cox)
@@ -200,108 +213,262 @@ Survival_plot <- autoplot(km_fit, surv.geom = "step",
         plot.title = element_text(face = "bold", size = 16),
         plot.subtitle = element_text(size = 12))
 
-ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Survival_Plot_Basic.jpeg",
-       plot = Survival_plot, width = 10, height = 6, dpi = 300, device = "jpeg")
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Survival_Plot_Basic.jpeg",
+#        plot = Survival_plot, width = 10, height = 6, dpi = 300, device = "jpeg")
 
 ```
 
-```{r}
+```{r Cox - Firth}
 
-
-Joint_long <- Joint_imp %>% 
-  select(ID, Event, Time, any_of(Glycans_Data$Marker)) %>% 
-  inner_join(Glycans_Data, by = "ID")
-
-Cox_Results_Uni <- Joint_long %>% 
-  group_by(Marker) %>% 
+Run_multi_coxf <- function(Top_Markers) {
+Joint_DF %>% 
+  select(ID, Time, Event, Marker, T0, T12, Delta) %>% 
+  pivot_longer(cols = -c(ID, Time, Event, Marker), names_to = "Comparison", values_to = "Value") %>% 
+  group_by(Comparison) %>% 
   nest() %>% 
-  ungroup() %>% 
-  crossing(Value_Variable = c("T0", "T12", "Delta", "Log2FC")) %>% 
-  mutate(Fit = map2(data, Value_Variable, ~ 
-                      coxph(reformulate(.y, response = "Surv(Time, Event)"), data = .x))) %>% 
-  mutate(Tidied = map2(Fit, Value_Variable, ~ broom::tidy(.x) %>% filter(term == .y))) %>% 
-  select(Marker, Tidied) %>%
-  unnest(Tidied) 
+  mutate(Markers = map(Comparison, ~ Top_Markers %>% 
+                         filter(Comparison == .x) %>% 
+                         pull(Marker)), 
+         
+         Data = map2(data, Markers, ~ .x %>% 
+                       filter(Marker %in% .y) %>% 
+                       select(ID, Time, Event, Marker, Value) %>% 
+                       pivot_wider(id_cols = c(ID, Time, Event), names_from = Marker, values_from = Value)), 
+         
+         Formula = map(Markers, ~ reformulate(.x, response = "Surv(Time, Event)")), 
+         
+         Fit = map2(Formula, Data, ~ coxphf(.x, data = .y, firth = TRUE, maxit = 200, maxstep = 0.2)), 
+         
+         Tidy = map(Fit, ~ {
+           fit <- .x
+           est <- coef(fit)
+           term <- names(coef(fit))
+           se <- sqrt(diag(vcov(fit)))
+           stat <- est/se
+           lower <- fit$ci.lower
+           upper <- fit$ci.upper
+           pval <- fit$prob
+         
+         tibble(Marker = term, 
+                estimate = est, 
+                std.error = se,
+                statistic = stat, 
+                p.value = pval, 
+                CI_lower = lower,
+                CI_upper = upper) } )) %>% 
+    unnest(Tidy) %>% 
+    select(Comparison, Marker, hazard_ratio = estimate, std.error, CI_lower, CI_upper, statistic, p.value) %>% 
+    group_by(Comparison) %>% 
+    mutate(FDR = p.adjust(p.value, method = "fdr")) %>%
+    ungroup() %>% 
+    mutate(Model = "Firth penalised")
+    
+}
 
-Cox_Sign_Markers <- Cox_Results_Uni %>% 
-  filter(p.value < 0.05) %>% 
-  group_by(term) %>% 
-  summarise(markers = unique(Marker), .groups = "drop")
+Cox_Results_Multi_firth <- Run_multi_coxf(Top_Markers_strict)
 
-Cox_Results_Multi <- Cox_Sign_Markers %>% 
-  filter(term %in% c("T0", "T12", "Delta")) %>%  
-  mutate(Data = map2(term, markers, ~ {
-    Joint_long %>%
-      filter(Marker %in% .y) %>%
-      select(ID, Time, Event, Marker, any_of(.x)) %>%
-      pivot_wider(id_cols = c(ID, Time, Event),
-                  names_from = Marker,
-                  values_from = .x)}),
-    Formula = map(markers, ~ reformulate(.x, response = "Surv(Time, Event)")),
-    Fit = map2(Formula, Data, ~ coxph(.x, data = .y))) %>%
-  # select(term, markers, Fit) %>% 
-  mutate(Tidy = map(Fit, ~ tidy(.x, exponentiate = TRUE, conf.int = TRUE) %>% 
-                      rename(Model = term))) %>% 
-  unnest(Tidy)
+```
+
+```{r Cox - Firth - Visualisation}
+
+Cox_Results_Multi_firth_clean <- Cox_Results_Multi_firth %>% 
+  mutate(Annotation = case_when(p.value < 0.05 ~ "Significant", 
+                                is.na(p.value) ~ "Model did not converge",
+                                TRUE ~ "Not significant"))
+
+Cox_Multi_firth_plot <- Cox_Results_Multi_firth_clean %>%
+  filter(Comparison == "Delta") %>%
+  separate(Marker, c("Origin", "Marker"), sep = "_", extra = "merge") %>% 
+  mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")), 
+         Origin = gsub("Serum", "Serum<br>proteome", Origin), 
+         Marker = factor(Marker, levels = c(unique(Marker))), 
+         Marker = if_else(p.value < 0.05, paste0("<span style='font-size:18px'>* </span>", Marker), Marker)) %>% 
+  ggplot(., aes(x = hazard_ratio, y = Marker, colour = Comparison)) +
+  geom_point(position = position_dodge(0.6), size = 3, na.rm = TRUE) +
+  geom_errorbarh(data = . %>% filter(!is.na(CI_lower) & !is.na(CI_upper)),
+                 aes(xmin = CI_lower, xmax = CI_upper),
+                 position = position_dodge(0.6),
+                 height = 0.2) +
+  scale_color_manual(values = c(T0 = "cyan3", T12 = "coral1", Delta = "mediumspringgreen"), 
+                   name = "Glycan values tested for<br>the cox regression") +
+  scale_x_log10() +
+  scale_y_discrete(drop = FALSE) +
+  facet_grid(Origin ~ ., scales = "free_y", space = "free_y", drop = FALSE) +
+  labs(title = "Cox regression results - Firth penalised: Hazard ratios with 95% CI", 
+       caption = paste0("Only markers which were significant in the non-penalised univariate analysis shown
+                        <br>T0 and T12 values did not converge and were ommited"),
+       x = "Hazard ratio") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0, face = "bold"),
+        panel.grid.major.y = element_blank(), 
+        axis.title.y = element_blank(),
+        axis.text.y = element_markdown(face = "bold"),
+        axis.title.x = element_markdown(), 
+        axis.ticks.x = element_blank(), 
+        legend.text = element_markdown(size = 10), 
+        plot.caption = element_markdown(lineheight = 1.3, hjust = 1), 
+        strip.text.y.right = element_markdown(angle = 0, 
+                                              hjust = 0.5, 
+                                              vjust = 0.5, 
+                                              face  = "bold"), 
+        strip.text.x.top = element_blank(), 
+        legend.title = element_markdown(face = "bold"))
+
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Cox_Multi_Firth.jpeg",
+#        plot = Cox_Multi_firth_plot, height = 10, width = 15, dpi = 300, device = "jpeg")
+
+```
+
+```{r Cox regression - Additive model}
+
+Run_multi_aalen <- function(Top_Markers) {
+Joint_DF %>% 
+  select(ID, Time, Event, Marker, T0, T12, Delta) %>% 
+  pivot_longer(cols = -c(ID, Time, Event, Marker), names_to = "Comparison", values_to = "Value") %>% 
+  group_by(Comparison) %>% 
+  nest() %>% 
+  mutate(Markers = map(Comparison, ~ Top_Markers %>% 
+                         filter(Comparison == .x) %>% 
+                         pull(Marker)), 
+         
+         Data = map2(data, Markers, ~ .x %>% 
+                       filter(Marker %in% .y) %>% 
+                       select(ID, Time, Event, Marker, Value) %>% 
+                       pivot_wider(id_cols = c(ID, Time, Event), names_from = Marker, values_from = Value)), 
+         
+         Formula = map(Markers, ~ reformulate(.x, response = "Surv(Time, Event)")), 
+         
+         Fit = map2(Formula, Data, ~ aalen(.x, data = .y, gamma = 1e-3)), 
+         
+         Tidy = map(Fit, function(fit) {
+           cum_mat <- fit$cum       
+           var_mat <- fit$var.cum    
+           last_cum <- tail(cum_mat, 1)     
+           last_var <- tail(var_mat, 1)      
+           terms <- colnames(cum_mat)[-1]   
+           est <- as.numeric(last_cum[-1]) 
+           se <- sqrt( as.numeric(last_var[-1]))
+           z <- est / se
+           pval <- 2 * pnorm(-abs(z))
+           ci_lo <- est - qnorm(0.975) * se
+           ci_hi <- est + qnorm(0.975) * se
+          
+           tibble(Marker = terms,
+                  estimate = est,
+                  std.error = se,
+                  statistic = z,
+                  p.value = pval,
+                  CI_lower = ci_lo,
+                  CI_upper = ci_hi) })) %>% 
+    
+    unnest(Tidy) %>% 
+    select(Comparison, Marker, estimate, std.error, CI_lower, CI_upper, statistic, p.value) %>% 
+    group_by(Comparison) %>% 
+    mutate(FDR = p.adjust(p.value, method = "fdr")) %>%
+    ungroup() %>% 
+    mutate(Model = "Aalen additive") %>% 
+    filter(Marker != "(Intercept)")
+    
+}
+
+Aalen_Results_Multi <- Run_multi_aalen(Top_Markers_strict)
 
 
-Test_1 <- Cox_Sign_Markers %>% 
-  filter(term == "Delta") %>% 
-  pull(markers)
+```
 
-Delta_DF <- Joint_long %>% 
-  select(ID, Time, Event, Marker, Delta) %>% 
-  pivot_wider(id_cols = c(ID, Time, Event), names_from = Marker, values_from = Delta)
+```{r Join the Cox - Delta multi models}
 
-coxph(reformulate(Test_1, response = "Surv(Time, Event)"), data = Delta_DF)
+Select_Columns <- c("Model", "Comparison", "Marker", 
+                    "hazard_ratio", "std.error", "CI_lower", 
+                    "CI_upper", "statistic", "p.value")
+
+Cox_multi <- Cox_Results_Multi_Total_strict %>% 
+  filter(Comparison == "Delta") %>% 
+  rename(CI_lower = conf.low, 
+         CI_upper = conf.high) %>% 
+  mutate(Model = "Cox regression") %>% 
+  select(Select_Columns)
+
+Coxf_multi <- Cox_Results_Multi_firth %>% 
+  filter(Comparison == "Delta") %>% 
+  mutate(estimate = hazard_ratio, 
+         hazard_ratio = exp(hazard_ratio)) %>% 
+  select(Select_Columns)
+
+Coxa_multi <- Aalen_Results_Multi %>% 
+  filter(Comparison == "Delta") %>% 
+  mutate(hazard_ratio = exp(estimate)) %>% 
+  select(Select_Columns)
+
+Multi_models_delta <- rbind(Cox_multi, Coxf_multi, Coxa_multi)
+
+```
+
+```{r Cox - Delta multi models - Visualisation}
+
+Model_Pallete <- c(`Cox regression` = "cyan3",
+                   `Firth penalised` = "coral1", 
+                   `Aalen additive` = "mediumspringgreen")
+
+Marker_annotation <- Multi_models_delta %>%
+  group_by(Marker) %>%
+  summarise(Annotation = {Sig_models <- unique(Model[p.value < 0.05])
   
+      if (length(Sig_models) == 0) {
+        ""
+      } else {
+        paste0(map_chr(Sig_models, ~ sprintf("<span style='color:%s; font-size:18px'>*</span>", 
+                                             Model_Pallete[.x])), collapse = " ") 
+        } }, .groups = "drop") %>% 
+  mutate(Marker = gsub("^[^_]+_", "", Marker))
+
+Multi_models_delta_clean <- Multi_models_delta %>% 
+  separate(Marker, c("Origin", "Marker"), sep = "_", extra = "merge") %>% 
+  mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")), 
+         Origin = gsub("Serum", "Serum<br>proteome", Origin), 
+         Marker = factor(Marker, levels = c(unique(Marker))), 
+         Significance = case_when(p.value < 0.05 ~ "Significant", 
+                                  TRUE ~ "Not significant")) %>% 
+  inner_join(Marker_annotation, by = "Marker") %>% 
+  mutate(Marker_annotation = paste0(Annotation, Marker))
+
+
+Multi_model_plot_strict <- Multi_models_delta_clean %>%
+  ggplot(., aes(x = hazard_ratio, y = Marker_annotation, colour = Model)) +
+  geom_point(position = position_dodge(0.6), size = 3,  na.rm = TRUE) +
+  geom_errorbarh(data = . %>% filter(!is.na(CI_lower) & !is.na(CI_upper)),
+                 aes(xmin = CI_lower, xmax = CI_upper),
+                 position = position_dodge(0.6),
+                 height = 0.2) +
+  scale_color_manual(values = Model_Pallete, 
+                     name = "Models tested") +
+  scale_x_log10() +
+  scale_y_discrete(drop = FALSE) +
+  facet_grid(Origin ~ ., scales = "free_y", space = "free_y", drop = FALSE) +
+  labs(title = "Cox regression results - Model comparison: Hazard ratios with 95% CI", 
+       caption = paste0("Only markers which were significant in the non-penalised univariate analysis shown
+                        <br>T0 and T12 values did not converge and were ommited"),
+       x = "Hazard ratio") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0, face = "bold"),
+        panel.grid.major.y = element_blank(), 
+        axis.title.y = element_blank(),
+        axis.text.y = element_markdown(face = "bold"),
+        axis.title.x = element_markdown(), 
+        axis.ticks.x = element_blank(), 
+        legend.text = element_markdown(size = 10), 
+        plot.caption.position = "plot",
+        plot.caption = element_markdown(lineheight = 1.3, hjust = 1), 
+        strip.text.y.right = element_markdown(angle = 0, 
+                                              hjust = 0.5, 
+                                              vjust = 0.5, 
+                                              face  = "bold"), 
+        strip.text.x.top = element_blank(), 
+        legend.title = element_markdown(face = "bold"))
+  
+
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Multi_models_strict.jpeg",
+#        plot = Multi_model_plot_strict, height = 10, width = 15, dpi = 300, device = "jpeg")
+
 ```
-
-
-```{r}
-
-X <- scale(model.matrix(Formula_2, data = Joint_imp)[, -1])
-
-cm2 <- cor_mat
-diag(cm2) <- NA
-which(abs(cm2) > 0.95, arr.ind=TRUE)
-
-Top_Markers_T0_strict_2 <- Top_Markers_T0_strict[! Top_Markers_T0_strict %in% c("Serum_S4", "Serum_GP38", "C3_CIIIGIRMN1N2H9")]
-Formula_2 <- reformulate(Top_Markers_T0_strict_2, response = "Surv(Time, Event)")
-
-fit_2 <- aareg(Formula_2, data = Joint_imp, nmin = 1)
-autoplot(fit_2)
-fit_2_cox <- coxph(Formula_2, data = Joint_imp)
-zph <- cox.zph(fit_2)
-
-```
-
-
-```{r}
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
