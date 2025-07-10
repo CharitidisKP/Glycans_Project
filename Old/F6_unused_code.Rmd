@@ -1,0 +1,17 @@
+```{r Check for colinearity and remove the markers with a significant value}
+
+X <- scale(model.matrix(Formula_2, data = Joint_imp)[, -1])
+
+cm2 <- cor_mat
+diag(cm2) <- NA
+which(abs(cm2) > 0.95, arr.ind=TRUE)
+
+Top_Markers_T0_strict_2 <- Top_Markers_T0_strict[! Top_Markers_T0_strict %in% c("Serum_S4", "Serum_GP38", "C3_CIIIGIRMN1N2H9")]
+Formula_2 <- reformulate(Top_Markers_T0_strict_2, response = "Surv(Time, Event)")
+
+fit_2 <- aareg(Formula_2, data = Joint_imp, nmin = 1)
+autoplot(fit_2)
+fit_2_cox <- coxph(Formula_2, data = Joint_imp)
+zph <- cox.zph(fit_2)
+
+```
