@@ -74,11 +74,20 @@ Correlations_Delta <- expand_grid(Marker = colnames(Glycan_Deltas),
 Correlations_Delta_Sign <- Correlations_Delta %>%
   group_by(Marker) %>% 
   filter(any(Significance == "*")) %>% 
-  ungroup()
+  ungroup() %>% 
+  separate(col = Marker, into = c("Origin", "Marker"), sep = "_", extra = "merge", fill = "right")
+
+max_len_Delta <- Correlations_Delta_Sign %>%
+  pull(Marker) %>%
+  nchar() %>%
+  max(na.rm = TRUE)
+
+Correlations_Delta_Sign_2 <- Correlations_Delta_Sign %>% 
+  mutate(Marker = str_pad(Marker, width = max_len_Delta, side = "left", pad = "\u00A0")) 
 
 # write_xlsx(Correlations_Delta, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Indices_Correlation.xlsx")
 
-Correlations_Delta_Sign_plot <- ggplot(Correlations_Delta_Sign, aes(x = Comparator, y = Marker, fill = Correlation)) +
+Correlations_Delta_Sign_plot <- ggplot(Correlations_Delta_Sign_2, aes(x = Comparator, y = Marker, fill = Correlation)) +
   geom_tile(color = "white", width = 1, height = 1) +
   scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
                        midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
@@ -156,7 +165,16 @@ Glycan_Deltas_vs_M12_Cor_Sign <- Glycan_Deltas_vs_M12_Cor %>%
   group_by(Marker) %>% 
   mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum"))) %>% 
   filter(any(Significance == "*")) %>% 
-  ungroup()
+  ungroup() %>% 
+  separate(col = Marker, into = c("Origin", "Marker"), sep = "_", extra = "merge", fill = "right")
+
+max_len_DM12 <- Glycan_Deltas_vs_M12_Cor_Sign %>%
+  pull(Marker) %>%
+  nchar() %>%
+  max(na.rm = TRUE)
+
+Correlations_Delta_Sign_2 <- Correlations_Delta_Sign %>% 
+  mutate(Marker = str_pad(Marker, width = max_len_DM12, side = "left", pad = "\u00A0")) 
 
 write_xlsx(Glycan_Deltas_vs_M12_Cor, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Indices_T12_Correlation.xlsx")
 

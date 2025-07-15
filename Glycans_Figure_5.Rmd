@@ -506,7 +506,7 @@ plot_GLM_results2 <- function(Dataframe_GLM, Model_Type) {
            y = "P value (-Log<sub>10</sub>)") + 
     geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
     geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
-    facet_wrap(~ Model, ncol = 3, scales = "free_x") +
+    facet_wrap(~ Model, ncol = 1, nrow = 3, scales = "free_x") +
     theme_minimal(base_size = 14) +
     theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
           legend.title = element_markdown(face = "bold"), 
@@ -522,8 +522,8 @@ plot_GLM_results2 <- function(Dataframe_GLM, Model_Type) {
 
 Firth_GLM_Plot2 <- plot_GLM_results2(Reg_Results_Firth_stats, "Firth's penalised")
 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline_A4.jpeg"),
-#        plot = Firth_GLM_Plot2, width = 297, height = 210, units = "mm", scale = 2, dpi = 300, device = "jpeg")
+ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline_A4.jpeg"),
+       plot = Firth_GLM_Plot2, width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
 # 
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline.jpeg"),
 #        plot = Firth_GLM_Plot2, width = 330, height = 200, units = "mm", scale = 2, dpi = 300, device = "jpeg")

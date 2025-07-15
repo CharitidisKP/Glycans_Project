@@ -184,6 +184,52 @@ Cox_Multi_plot <- Plot_Cox_Results(Cox_Results_Multi_Total_strict, "Multivariate
 
 ```
 
+
+```{r Visualise normal Cox results - Manual}
+
+
+ Cox_Results_Multi_Total_strict %>% 
+  filter(Comparison == "T12") %>% 
+  separate(Marker, c("Origin", "Marker"), sep = "_", extra = "merge") %>% 
+  mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")), 
+         Origin = gsub("Serum", "Serum<br>proteome", Origin), 
+         Marker = if_else(p.value < 0.05, paste0("<span style='font-size:18px'>* </span>", Marker), Marker)) %>% 
+    # { if (Filter) filter(., p.value < 0.05) else . } %>% 
+  ggplot(., aes(x = hazard_ratio, y = Marker, colour = Comparison)) +
+      geom_point(position = position_dodge(0.6), size = 3) +
+      geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
+                     position = position_dodge(0.6),
+                     height = 0.2) +
+    scale_color_manual(values = c(T0 = "cyan3", T12 = "coral1", Delta = "mediumspringgreen"), 
+                       name = "Glycan values tested for<br>the cox regression") +
+      scale_x_log10(limits = c(0.2, 5), oob = oob_squish) +
+      facet_grid(Origin ~ ., scales = "free_y", space = "free_y") +
+      labs(title = "Multivariate Cox regression: Hazard ratios with 95% CI", 
+           caption = "Only markers which were significant in the univariate analysis shown", 
+           x = "Hazard ratio") +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0, face = "bold"),
+            panel.grid.major.y = element_blank(), 
+            axis.title.y = element_blank(),
+            axis.text.y = element_markdown(face = "bold"),
+            axis.title.x = element_markdown(), 
+            axis.ticks.x = element_blank(), 
+            legend.text = element_markdown(size = 10), 
+            plot.caption = element_markdown(), 
+            strip.text.y.right = element_markdown(angle = 0, 
+                                                  hjust = 0.5, 
+                                                  vjust = 0.5, 
+                                                  face  = "bold"), 
+            legend.title = element_markdown(face = "bold"))
+
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Cox_Uni_Sign.jpeg", 
+#        plot = Cox_Uni_plot, height = 10, width = 15, dpi = 300, device = "jpeg")
+# 
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Cox_Multi.jpeg", 
+#        plot = Cox_Multi_plot, height = 10, width = 15, dpi = 300, device = "jpeg")
+
+```
+
 ```{r Kaplan meier plot}
 
 cox <- coxph(Surv(Time, Event) ~ 1, data = Survival_Data)
@@ -469,6 +515,77 @@ Multi_model_plot_strict <- Multi_models_delta_clean %>%
 
 # ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Multi_models_strict.jpeg",
 #        plot = Multi_model_plot_strict, height = 10, width = 15, dpi = 300, device = "jpeg")
+
+```
+
+
+```{r Alternative Multivariate Cox visualisation}
+
+Cox_Results_Multi_firth_clean <- Cox_Results_Multi_firth %>% 
+  mutate(Annotation = case_when(p.value < 0.05 ~ "Significant", 
+                                is.na(p.value) ~ "Model did not converge",
+                                TRUE ~ "Not significant"))
+
+Cox_Multi_firth_plot2 <- Cox_Results_Multi_firth_clean %>%
+  filter(Comparison == "Delta") %>%
+  separate(Marker, c("Origin", "Marker"), sep = "_", extra = "merge") %>% 
+  mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")), 
+         Origin = gsub("Serum", "Serum<br>proteome", Origin), 
+         Marker = factor(Marker, levels = c(unique(Marker))), 
+         Marker = if_else(p.value < 0.05, paste0("<span style='font-size:18px'>* </span>", Marker), Marker)) %>% 
+  ggplot(., aes(x = hazard_ratio, y = Marker, colour = Comparison)) +
+  geom_point(position = position_dodge(0.6), size = 3, na.rm = TRUE) +
+  geom_errorbarh(data = . %>% filter(!is.na(CI_lower) & !is.na(CI_upper)),
+                 aes(xmin = CI_lower, xmax = CI_upper),
+                 position = position_dodge(0.6),
+                 height = 0.2) +
+  scale_color_manual(values = c(T0 = "cyan3", T12 = "coral1", Delta = "mediumspringgreen"), 
+                   name = "Glycan values tested for<br>the cox regression") +
+  scale_x_log10() +
+  scale_y_discrete(drop = FALSE) +
+  facet_grid(Origin ~ ., scales = "free_y", space = "free_y", drop = FALSE) +
+  labs(title = "Multivariate Cox regression - Firth penalised: Hazard ratios with 95% CI", 
+       caption = paste0("Only markers which were significant in the non-penalised univariate analysis shown
+                        <br>T0 and T12 values did not converge and were ommited"),
+       x = "Hazard ratio") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0, face = "bold"),
+        panel.grid.major.y = element_blank(), 
+        axis.title.y = element_blank(),
+        axis.text.y = element_markdown(face = "bold", size = 11),
+        axis.title.x = element_markdown(), 
+        axis.ticks.x = element_blank(), 
+        legend.text = element_markdown(size = 10), 
+        plot.caption = element_markdown(lineheight = 1.3, hjust = 1), 
+        strip.text.y.right = element_markdown(angle = 0, 
+                                              hjust = 0.5, 
+                                              vjust = 0.5, 
+                                              face  = "bold", size = 11), 
+        strip.text.x.top = element_blank(), 
+        legend.title = element_markdown(face = "bold"))
+
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Cox_Multi_Firth.jpeg",
+#        plot = Cox_Multi_firth_plot, height = 10, width = 15, dpi = 300, device = "jpeg")
+
+```
+
+```{r Combined plots}
+
+library(patchwork)
+
+
+Combined_Uni_Multi_all <- wrap_plots(Cox_Uni_plot, Multi_model_plot_strict, nrow = 2)  +
+  plot_layout(heights = c(2, 1))
+
+Combined_Uni_Multi_firth <- wrap_plots(Cox_Uni_plot, Cox_Multi_firth_plot2, nrow = 2)  +
+  plot_layout(heights = c(2, 1)) + 
+  plot_annotation(tag_levels = "A") & 
+  theme(plot.tag = element_text(color = "black", face = "bold", size = 30), 
+        plot.caption = element_blank())
+
+ggsave(plot = Combined_Uni_Multi_firth,
+       filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Combined_firth.jpeg",
+       width = 210, height = 297, units = "mm", dpi = 300, device = "jpeg", scale = 2)
 
 ```
 
