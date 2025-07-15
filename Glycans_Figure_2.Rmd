@@ -405,13 +405,13 @@ final_plot <- wrap_plots(
   # heights = c(n1, n2, n3),
   guides = "collect") +
   plot_annotation(
-    title = "Heatmap of marker correlations compared to clicinal indices",
+    
     tag_levels = "A",   
   theme = theme(
     plot.title = element_text(face = "bold", size = 23),
     plot.title.position = "plot", 
     plot.title.hjust = 0.5,       
-    plot.tag = element_text(face = "bold", colour = "black", size = 16))) &
+    plot.tag = element_text(face = "bold", colour = "black", size = 30))) &
   theme(
     legend.position = "right",
     legend.title = element_text(face = "bold"),
@@ -419,8 +419,9 @@ final_plot <- wrap_plots(
     legend.key.height = unit(4, "lines"),    
     legend.spacing.y = unit(0.5, "lines"))
 
-final_plot_final <- final_plot & 
-  theme(plot.tag = element_text(color = "black", face = "bold", size = 20))
+final_plot_final <- final_plot +
+  plot_annotation(title = "Heatmap of marker correlations compared to clicinal indices") & 
+  theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
 
 ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Cor_per_origin_combined.jpeg",
        plot = final_plot_final, width = 30, height = 18, dpi = 300)
