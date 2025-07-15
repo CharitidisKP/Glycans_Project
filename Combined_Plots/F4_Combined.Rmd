@@ -20,6 +20,13 @@ Glycan_Deltas_vs_M12_Cor_Sign <- read_xlsx("~/SLE/Glycans/Data/Results/Delta_Cor
   filter(any(Significance == "*")) %>% 
   ungroup()
 
+NIH_mapping <- c(Cellular_crescents = "Cellular/Fibrocellular_crescents",
+                 Cellular_proliferation = "Endocapillary_hypercellularity",
+                 Fibrinoid_necrosis_karyorrhexis = "Fibrinoid_necrosis",
+                 Hyaline_thrombi_wire_loops = "Hyaline_deposits",
+                 Leukocyte_infiltration = "Neutrophiles/Karyorrhexis",
+                 Mononuclear_cell_infiltration = "Interstitial_inflammation")
+
 Delta_Hist_Cor_Res_Sign <- read_xlsx("~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Hist_Correlation.xlsx") %>% 
   mutate(Category = gsub("_", " ", Category), 
          Histology = recode(Histology, !!!NIH_mapping), 
@@ -176,33 +183,10 @@ Gabagool <- wrap_plots(p3, p4,
     legend.key.height = unit(4, "lines"),    
     legend.spacing.y = unit(0.5, "lines"))
 
-Gabagool <- Gabagool & theme(plot.tag = element_text(color = "black", face = "bold", size = 20))
+Gabagool <- Gabagool & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
 
 ggsave(plot = Gabagool, 
        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_Corr_Combined.jpeg",
-       width = 20, height = 15, dpi = 300, device = "jpeg")
+       width = 297, height = 210, units = "mm", scale = 2, dpi = 300, device = "jpeg")
+
 ```
-
-```{r}
-
-
-pA <- p3 + labs(tag = "C")  # p3 gets tag “C”
-pB <- p4 + labs(tag = "A")  # p4 gets tag “A”
-pC <- p1 + labs(tag = "D")  # etc …
-pD <- p2 + labs(tag = "B")
-
-combined <- wrap_plots(
-  pA, pB,
-  pC, pD,
-  ncol   = 2,
-  guides = "collect"
-) +
-plot_annotation(
-  title = "My Custom-Tagged Figure",
-  theme = theme(plot.title = element_text(face="bold", hjust = 0.5))
-) &
-theme(legend.position = "bottom")
-
-print(combined)
-```
-
