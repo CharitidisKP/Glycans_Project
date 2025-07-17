@@ -10,6 +10,7 @@ library(ggtext)
 library(ggplot2)
 library(logistf) ## Firth’s logistf() ##
 library(glmnet) ## Penalised regression ##
+library(patchwork)
 
 library(ggtext)
 library(ggrepel)
@@ -379,7 +380,8 @@ plot_GLM_results <- function(Dataframe_GLM, Method, Model_Type, Double_Sign_Mark
   
   DF_Plot <- Dataframe_GLM %>% 
     filter(Model == Method) %>% 
-    mutate(Title = case_when(Model == "Delta" ~ "delta", 
+    mutate(Title = case_when(Model == "T0" ~ "baseline", 
+                             Model == "Delta" ~ "delta", 
                              Model == "T12" ~ "month 12", 
                              Model == "Log2FC" ~ "log<sub>2</sub>FC", 
                              TRUE ~ "Yeet"))
@@ -451,6 +453,8 @@ plot_GLM_results <- function(Dataframe_GLM, Method, Model_Type, Double_Sign_Mark
 Firth_Double_sign_log2 <- plot_GLM_results(Reg_Results_Firth_stats, "Log2FC", "Firth's penalised", Double_Sign_Markers)
 Firth_Double_sign_delta <- plot_GLM_results(Reg_Results_Firth_stats, "Delta", "Firth's penalised", Double_Sign_Markers)
 Firth_Double_sign_M12 <- plot_GLM_results(Reg_Results_Firth_stats, "T12", "Firth's penalised", Double_Sign_Markers)
+Firth_Double_sign_T0 <- plot_GLM_results(Reg_Results_Firth_stats, "T0", "Firth's penalised", Double_Sign_Markers)
+
 
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_Double_sign_log2.jpeg"),
 #        plot = Firth_Double_sign_log2, width = 12, height = 8, dpi = 300, device = "jpeg")
@@ -522,12 +526,161 @@ plot_GLM_results2 <- function(Dataframe_GLM, Model_Type) {
 
 Firth_GLM_Plot2 <- plot_GLM_results2(Reg_Results_Firth_stats, "Firth's penalised")
 
-ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline_A4.jpeg"),
-       plot = Firth_GLM_Plot2, width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
+# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline_A4.jpeg"),
+#        plot = Firth_GLM_Plot2, width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
 # 
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline.jpeg"),
 #        plot = Firth_GLM_Plot2, width = 330, height = 200, units = "mm", scale = 2, dpi = 300, device = "jpeg")
 
 ```
 
+
+
+
+
+
+
+
+
+```{r}
+
+plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
+
+  lgnd_cols <- c("Significant in both" = "deeppink3",
+                 "Significant in clinical" = "royalblue", 
+                 "Significant in histological" = "mediumspringgreen",
+                 "Not significant" = "grey80")
+
+  legend_df <- tibble(OR = 1,
+                      p.value = 1,
+                      Highlight = names(lgnd_cols),
+                      Significance = "Not Significant")
+
+  DF_Summary <- Dataframe_GLM %>% 
+    filter(Model == Method) %>%
+    filter(p.value < 0.05) %>%
+    group_by(Marker) %>%
+    summarize(clinical_sig = any(Outcome == "Clinical"),
+              histo_sig = any(Outcome == "Histological"),
+              .groups = "drop")
+    
+  DF_Plot <- Dataframe_GLM %>% 
+    filter(Model == Method) %>%
+    mutate(Title = case_when(Model == "T0" ~ "baseline", 
+                             Model == "Delta" ~ "delta", 
+                             Model == "T12" ~ "month 12", 
+                             Model == "Log2FC" ~ "log<sub>2</sub>FC", 
+                             TRUE ~ "Yeet")) %>% 
+    left_join(DF_Summary, by = "Marker") %>%
+    mutate(Model = sub("Log2FC", "Log<sub>2</sub>FC", Model), 
+             Highlight = case_when(clinical_sig & histo_sig  ~ "Significant in both",
+                                   clinical_sig & !histo_sig ~ "Significant in clinical", 
+                                   !clinical_sig & histo_sig ~ "Significant in histological",
+                                   TRUE ~ "Not significant"), 
+             Label = gsub("_", " ", Marker), 
+             Highlight = factor(Highlight, levels = c("Significant in both", 
+                                                      "Significant in clinical",
+                                                      "Significant in histological",
+                                                      "Not significant")))
+
+  Current_Title <- DF_Plot %>% 
+    select(Title) %>% 
+    distinct() %>% 
+    pull()
+  
+  Sign_Markers_current <- DF_Plot %>% 
+    filter(p.value < 0.05) %>% 
+    group_by(Marker) %>%
+    filter(clinical_sig & histo_sig) %>% 
+    select(Marker) %>% 
+    distinct() %>% 
+    pull() 
+
+  Double_sign_Plot <- ggplot(DF_Plot, aes(x = log10(OR), y = -log10(p.value))) +
+    # geom_point(data = legend_df, aes(x = log10(OR), y = -log10(p.value), size = 0)) +
+    geom_point(data = DF_Plot, aes(color = Highlight, alpha = Significance), size = 2, show.legend = TRUE) +
+    geom_text_repel(data = DF_Plot %>% filter(Highlight == "Significant in both"), 
+                    aes(label = Label), 
+                    color = "black", 
+                    size = 4, 
+                    force = 2,
+                    box.padding = 0.3, 
+                    point.padding = 0.1, 
+                    segment.color = NA, 
+                    max.overlaps = Inf, 
+                    min.segment.length = 0) +
+    scale_colour_manual(values = lgnd_cols, 
+                        limits = names(lgnd_cols),
+                        drop = FALSE) +
+    scale_alpha_manual(values = c("Significant" = 1.0, 
+                                  "Not Significant" = 0.2), 
+                                  guide = "none") +
+    scale_x_continuous(limits = c(-10, 10),
+                       breaks = seq(-10, 10, by = 5),
+                       expand = expansion(mult = c(0.05, 0.05))) +
+    facet_wrap(~ Outcome, ncol = 2, scales = "free_x") +
+    labs(title = paste0("Comparisons using ", Current_Title, " values"), 
+         x = "Odds Ratio (Log<sub>10</sub>)", 
+         y = "P value (-Log<sub>10</sub>)") + 
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
+    geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
+    theme_minimal(base_size = 14) +
+    theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
+          # legend.title = element_markdown(face = "bold"), 
+          legend.title = element_blank(), 
+          legend.text = element_markdown(face = "bold"), 
+          axis.title.x = element_markdown(face = "bold"), 
+          axis.title.y = element_markdown(face = "bold"), 
+          strip.text.x.top = element_markdown(size = 11, hjust = 0.5, vjust = 0.5, face  = "bold"),
+          plot.caption.position = "plot", 
+          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+          panel.grid.major = element_line(color = "grey90"),
+          panel.grid.minor = element_blank()) 
+  
+    # if (Method == "T0") {
+    # Double_sign_Plot <- Double_sign_Plot +
+    #   theme(legend.position = "none") }
+  
+  Double_sign_Plot
+          
+}
+
+Double_log2 <- plot_GLM_results_final(Reg_Results_Firth_stats, "Log2FC", Double_Sign_Markers)
+Double_delta <- plot_GLM_results_final(Reg_Results_Firth_stats, "Delta", Double_Sign_Markers)
+Double_M12 <- plot_GLM_results_final(Reg_Results_Firth_stats, "T12", Double_Sign_Markers)
+Double_T0 <- plot_GLM_results_final(Reg_Results_Firth_stats, "T0", Double_Sign_Markers)
+
+```
+
+
+
+```{r}
+
+Yeet <- wrap_plots(Double_delta, Double_M12, Double_T0, 
+           ncol = 1, 
+           guides = "collect") +
+  plot_annotation(tag_levels = "A", 
+                  title = "Firth penalised logistic regression 
+                  <br>Comparison between marker values and clinical/histological outcomes",
+                  theme = theme(plot.title = element_text(face = "bold", size = 23),
+                                plot.title.position = "plot", 
+                                plot.title.hjust = 0.5,       
+                                plot.tag = element_text(face = "bold", 
+                                                        colour = "black", 
+                                                        size = 30))) +
+  plot_layout(axis_titles = "collect") &
+  theme(plot.title = element_markdown(face = "bold"), 
+        legend.position = "right",
+        legend.title = element_text(face = "bold"),
+        legend.key.width = unit(2, "lines"),
+        legend.key.height = unit(4, "lines"),    
+        legend.spacing.y = unit(0.5, "lines"))
+
+Yeet <- Yeet & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
+
+ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta.jpeg", 
+       plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
+
+
+```
 
