@@ -433,18 +433,18 @@ Cox_multi <- Cox_Results_Multi_Total_strict %>%
   rename(CI_lower = conf.low, 
          CI_upper = conf.high) %>% 
   mutate(Model = "Cox regression") %>% 
-  select(Select_Columns)
+  select(any_of(Select_Columns))
 
 Coxf_multi <- Cox_Results_Multi_firth %>% 
   filter(Comparison == "Delta") %>% 
   mutate(estimate = hazard_ratio, 
          hazard_ratio = exp(hazard_ratio)) %>% 
-  select(Select_Columns)
+  select(any_of(Select_Columns))
 
 Coxa_multi <- Aalen_Results_Multi %>% 
   filter(Comparison == "Delta") %>% 
   mutate(hazard_ratio = exp(estimate)) %>% 
-  select(Select_Columns)
+  select(any_of(Select_Columns))
 
 Multi_models_delta <- rbind(Cox_multi, Coxf_multi, Coxa_multi)
 
@@ -583,9 +583,9 @@ Combined_Uni_Multi_firth <- wrap_plots(Cox_Uni_plot, Cox_Multi_firth_plot2, nrow
   theme(plot.tag = element_text(color = "black", face = "bold", size = 30), 
         plot.caption = element_blank())
 
-ggsave(plot = Combined_Uni_Multi_firth,
-       filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Combined_firth.jpeg",
-       width = 210, height = 297, units = "mm", dpi = 300, device = "jpeg", scale = 2)
+# ggsave(plot = Combined_Uni_Multi_firth,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Combined_firth.jpeg",
+#        width = 210, height = 297, units = "mm", dpi = 300, device = "jpeg", scale = 2)
 
 ```
 
