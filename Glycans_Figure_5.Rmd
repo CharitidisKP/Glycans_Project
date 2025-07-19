@@ -402,7 +402,7 @@ plot_GLM_results <- function(Dataframe_GLM, Method, Model_Type, Double_Sign_Mark
   
     DF_Plot_clean <- DF_Plot %>% 
     mutate(Model = sub("Log2FC", "Log<sub>2</sub>FC", Model)) %>% 
-    mutate(Highlight = case_when(Marker %in% Sign_Markers_current ~ "Significant in both models", 
+    mutate(Highlight = case_when(Marker %in% Sign_Markers_current ~ "Significant in both<br>response types models", 
                                  Significance == "Significant" ~ "Significant in one model",
                                  TRUE ~ "Not significant"), 
            Label = gsub("_", " ", Marker))
@@ -419,7 +419,7 @@ plot_GLM_results <- function(Dataframe_GLM, Method, Model_Type, Double_Sign_Mark
                     segment.color = NA, 
                     max.overlaps = Inf, 
                     min.segment.length = 0) +
-    scale_colour_manual(values = c("Significant in both models" = "deeppink3", 
+    scale_colour_manual(values = c("Significant in both<br>response types models" = "deeppink3", 
                                    "Significant in one model" = "royalblue", 
                                    "Not significant" = "grey")) +
     scale_alpha_manual(values = c("Significant" = 1.0, 
@@ -546,9 +546,9 @@ Firth_GLM_Plot2 <- plot_GLM_results2(Reg_Results_Firth_stats, "Firth's penalised
 
 plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
 
-  lgnd_cols <- c("Significant in both" = "deeppink3",
-                 "Significant in clinical" = "royalblue", 
-                 "Significant in histological" = "mediumspringgreen",
+  lgnd_cols <- c("Significant in both<br>response types" = "deeppink3",
+                 "Significant in<br>clinical response" = "royalblue", 
+                 "Significant in<br>histological response" = "mediumspringgreen",
                  "Not significant" = "grey80")
 
   legend_df <- tibble(OR = 1,
@@ -573,14 +573,14 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
                              TRUE ~ "Yeet")) %>% 
     left_join(DF_Summary, by = "Marker") %>%
     mutate(Model = sub("Log2FC", "Log<sub>2</sub>FC", Model), 
-             Highlight = case_when(clinical_sig & histo_sig  ~ "Significant in both",
-                                   clinical_sig & !histo_sig ~ "Significant in clinical", 
-                                   !clinical_sig & histo_sig ~ "Significant in histological",
+             Highlight = case_when(clinical_sig & histo_sig  ~ "Significant in both<br>response types",
+                                   clinical_sig & !histo_sig ~ "Significant in<br>clinical response", 
+                                   !clinical_sig & histo_sig ~ "Significant in<br>histological response",
                                    TRUE ~ "Not significant"), 
              Label = gsub("_", " ", Marker), 
-             Highlight = factor(Highlight, levels = c("Significant in both", 
-                                                      "Significant in clinical",
-                                                      "Significant in histological",
+             Highlight = factor(Highlight, levels = c("Significant in both<br>response types", 
+                                                      "Significant in<br>clinical response",
+                                                      "Significant in<br>histological response",
                                                       "Not significant")))
 
   Current_Title <- DF_Plot %>% 
@@ -599,7 +599,7 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
   Double_sign_Plot <- ggplot(DF_Plot, aes(x = log10(OR), y = -log10(p.value))) +
     # geom_point(data = legend_df, aes(x = log10(OR), y = -log10(p.value), size = 0)) +
     geom_point(data = DF_Plot, aes(color = Highlight, alpha = Significance), size = 2, show.legend = TRUE) +
-    geom_text_repel(data = DF_Plot %>% filter(Highlight == "Significant in both"), 
+    geom_text_repel(data = DF_Plot %>% filter(Highlight == "Significant in both<br>response types"), 
                     aes(label = Label), 
                     color = "black", 
                     size = 4, 
@@ -628,7 +628,8 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
     theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
           # legend.title = element_markdown(face = "bold"), 
           legend.title = element_blank(), 
-          legend.text = element_markdown(face = "bold"), 
+          legend.text = element_markdown(face = "bold", padding = unit(1, "lines")), 
+          # legend.key.spacing = unit(1.5, "lines"), 
           axis.title.x = element_markdown(face = "bold"), 
           axis.title.y = element_markdown(face = "bold"), 
           strip.text.x.top = element_markdown(size = 11, hjust = 0.5, vjust = 0.5, face  = "bold"),
@@ -678,9 +679,8 @@ Yeet <- wrap_plots(Double_delta, Double_M12, Double_T0,
 
 Yeet <- Yeet & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
 
-ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta.jpeg", 
+ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta.jpeg",
        plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
-
 
 ```
 
