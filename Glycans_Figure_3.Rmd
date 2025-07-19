@@ -198,7 +198,10 @@ max_len_NIH <- NIH_Corr_Res_Sign_only_Clean %>%
   max(na.rm = TRUE)
 
 NIH_Corr_Res_Sign_only_Clean_2 <- NIH_Corr_Res_Sign_only_Clean %>% 
-  mutate(Marker = str_pad(Marker, width = max_len_NIH, side = "left", pad = "\u00A0")) 
+  arrange(Category, Result) %>% 
+  mutate(Marker = str_pad(Marker, width = max_len_NIH, side = "left", pad = "\u00A0"), 
+         Result = factor(Result, levels = unique(Result))) 
+  
 
 Main_plot_current_combined <- ggplot(NIH_Corr_Res_Sign_only_Clean_2, aes(x = Result, y = Marker, fill = Correlation)) +
     geom_tile(color = "white", width = 1, height = 1) +
@@ -227,8 +230,8 @@ Main_plot_current_combined <- ggplot(NIH_Corr_Res_Sign_only_Clean_2, aes(x = Res
           plot.caption = element_markdown(hjust = 0.9, vjust = 1, lineheight = 1.3),
           plot.title = element_markdown(face = "bold", lineheight = 1.2))
 
-  ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_3_Correlations_NIH/Correlations_NIH_Combined_A4.jpeg",
-         plot = Main_plot_current_combined, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_3_Correlations_NIH/Correlations_NIH_Combined_A4.jpeg",
+#        plot = Main_plot_current_combined, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
 
 ```
 
