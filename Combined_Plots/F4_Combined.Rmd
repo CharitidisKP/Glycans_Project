@@ -4,6 +4,7 @@ library(tidyverse)
 library(readxl)
 library(ggtext)
 library(ggplot2)
+library(patchwork)
 
 ```
 
@@ -97,13 +98,13 @@ Correlations_Delta_Sign_plot <- ggplot(Correlations_Delta_Sign_2, aes(x = Compar
   scale_x_discrete(labels = function(x) gsub("_", " ", x), expand = c(0,0)) +
   labs(title = "Glycan deltas compared to clinical indices deltas", 
        x = NULL, y = NULL) +
-  theme_minimal(base_size = 12, base_family = "sans") +
+  theme_minimal(base_size = 11, base_family = "sans") +
   theme(strip.placement = "outside",
-        strip.text.y.right = element_markdown(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        strip.text.y.right = element_markdown(size = 11, angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
         axis.text.x = element_markdown(size = 11, angle = 0, hjust = 0.5, 
                                        # face = "bold", 
                                        colour = "black"), 
-        axis.text.y = element_text(size = 11, face = "bold", colour = "black"),
+        axis.text.y = element_markdown(size = 11, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
         plot.caption.position = "plot", 
@@ -133,13 +134,13 @@ Glycan_Deltas_vs_M12_Cor_Sign_plot <- ggplot(Glycan_Deltas_vs_M12_Cor_Sign_2, ae
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
   labs(title = "Glycan deltas compared to month 12 indices values", x = NULL, y = NULL) +
-  theme_minimal(base_size = 12, base_family = "sans") +
+  theme_minimal(base_size = 11, base_family = "sans") +
   theme(strip.placement = "outside",
-        strip.text.y.right = element_markdown(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        strip.text.y.right = element_markdown(size = 11, angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
         axis.text.x = element_markdown(size = 11, angle = 0, hjust = 0.5, 
                                        # face = "bold",
                                        colour = "black"), 
-        axis.text.y = element_text(size = 11, face = "bold", colour = "black"),
+        axis.text.y = element_markdown(size = 11, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
         plot.caption.position = "plot", 
@@ -165,7 +166,8 @@ Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
     max(na.rm = TRUE)
 
   Dataframe_clean_2 <- Dataframe_clean %>%
-    mutate(Marker = str_pad(Marker, width = max_len_current, side = "left", pad = "\u00A0"))
+    mutate(Marker = str_pad(Marker, width = max_len_current, side = "left", pad = "\u00A0"), 
+           Origin = gsub("Serum", "Serum<br>proteome", Origin))
   
   this_plot <- ggplot(Dataframe_clean_2, aes(x = Histology, y = Marker, fill = Correlation)) +
     geom_tile(color = "white", width = 1, height = 1) +
@@ -178,9 +180,9 @@ Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
     scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
     scale_y_discrete(expand = c(0, 0)) +
     geom_text(aes(label = Significance, vjust = 0.7, hjust = 0.5, fontface = "bold")) +
-    labs(title = paste0("Glycan deltas compared to<br>clinical/histopathological ", Title , " values"), 
+    labs(title = paste0("Glycan deltas compared to clinical/histopathological ", Title , " values"), 
          x = NULL, y = NULL) +
-    theme_minimal(base_size = 12, base_family = "sans") +
+    theme_minimal(base_size = 11, base_family = "sans") +
     theme(strip.placement = "outside",
           strip.text.y.right = element_markdown(size = 11, angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
           strip.text.x.top = element_markdown(size = 11, angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
@@ -217,15 +219,15 @@ Gabagool <- wrap_plots(p3, p4,
   plot_annotation(title = "Correlation heatmap<br>
                   Comparisons between glycan deltas, clinical indices and clinical/histopathological values", 
                   theme = theme(plot.title = element_markdown(face = "bold", size = 23, hjust = 0.5),
-                                plot.tag = element_text(face = "bold", size = 16))) &
+                                plot.tag = element_markdown(face = "bold", size = 16))) &
   theme(
     legend.position = "right",
-    legend.title = element_text(face = "bold"),
+    legend.title = element_markdown(face = "bold"),
     legend.key.width = unit(2, "lines"),
     legend.key.height = unit(4, "lines"),    
     legend.spacing.y = unit(0.5, "lines"))
 
-Gabagool <- Gabagool & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
+Gabagool <- Gabagool & theme(plot.tag = element_markdown(color = "black", face = "bold", size = 30))
 
 Gabagool
 
@@ -249,17 +251,21 @@ Gabagool <- wrap_plots(p3, p4,
                        guides = "collect") +
   plot_annotation(title = "Correlation heatmap<br>
                   Comparisons between glycan deltas, clinical indices and clinical/histopathological values", 
-                  theme = theme(plot.title = element_markdown(face = "bold", size = 23, hjust = 0.5),
-                                plot.tag = element_text(face = "bold", size = 16))) &
+                  theme = theme(plot.title = element_markdown(face = "bold", size = 23, hjust = 0),
+                                plot.tag = element_markdown(face = "bold", size = 16))) &
   theme(
     legend.position = "right",
-    legend.title = element_text(face = "bold"),
+    legend.title = element_markdown(face = "bold"),
     legend.key.width = unit(2, "lines"),
     legend.key.height = unit(4, "lines"),    
-    legend.spacing.y = unit(0.5, "lines"), 
-    axis.text = element_markdown(size = 11))
+    legend.spacing.y = unit(0.5, "lines"))
 
-Gabagool <- Gabagool & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
+Gabagool <- Gabagool & theme(plot.tag = element_markdown(color = "black", face = "bold", size = 30), 
+                             axis.text = element_markdown(size = 11), 
+                             axis.text.y = element_markdown(margin = margin(5)),
+                             strip.text.y.right = element_markdown(hjust = 0, vjust = 0.5))
+
+Gabagool
 
 ggsave(plot = Gabagool,
        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_Corr_Combined_A4.jpeg",
