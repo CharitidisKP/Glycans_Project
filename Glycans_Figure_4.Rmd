@@ -317,7 +317,8 @@ Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
     max(na.rm = TRUE)
 
   Dataframe_clean_2 <- Dataframe_clean %>% 
-    mutate(Marker = str_pad(Marker, width = max_len_DM12, side = "left", pad = "\u00A0")) 
+    mutate(Marker = str_pad(Marker, width = max_len_DM12, side = "left", pad = "\u00A0"), 
+           Origin = gsub("Serum", "Serum<br>proteome", Origin)) 
   
   this_plot <- ggplot(Dataframe_clean_2, aes(x = Histology, y = Marker, fill = Correlation)) +
     geom_tile(color = "white", width = 1, height = 1) +
