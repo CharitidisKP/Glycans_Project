@@ -104,7 +104,7 @@ Volcano_FDR <- ggplot(FCR_Values_clean, aes(x = log2FC, y = FDR_log10)) +
          caption = paste0("<b>P value:</b> FDR adjusted
          <br><b>Number of significant markers:</b> ", 
          FCR_Values_clean %>% 
-           filter(p.value < 0.05) %>% 
+           filter(FDR < 0.05) %>% 
            nrow(), "</br>")) +   
     geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
     geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
