@@ -653,8 +653,6 @@ Double_T0 <- plot_GLM_results_final(Reg_Results_Firth_stats, "T0", Double_Sign_M
 
 ```
 
-
-
 ```{r}
 
 Yeet <- wrap_plots(Double_delta, Double_M12, Double_T0, 
@@ -679,8 +677,8 @@ Yeet <- wrap_plots(Double_delta, Double_M12, Double_T0,
 
 Yeet <- Yeet & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
 
-ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta.jpeg",
-       plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta.jpeg",
+#        plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
 
 ```
 
