@@ -4,7 +4,7 @@ library(tidyverse)
 library(ggplot2)
 library(readxl)
 library(survival)
-library(ranger)
+# library(ranger)
 library(ggplot2)
 library(dplyr)
 library(ggfortify)
@@ -594,9 +594,42 @@ Combined_Uni_Multi_firth <- wrap_plots(Cox_Uni_plot, Cox_Multi_firth_plot2, nrow
         strip.text.y.right = element_markdown(size = 11, face = "bold", hjust = 0),
         plot.title = element_markdown(size = 16, face = "bold"))
 
-ggsave(plot = Combined_Uni_Multi_firth,
-       filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Combined_firth.jpeg",
-       width = 210, height = 297, units = "mm", dpi = 300, device = "jpeg", scale = 2)
+# ggsave(plot = Combined_Uni_Multi_firth,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Combined_firth.jpeg",
+#        width = 210, height = 297, units = "mm", dpi = 300, device = "jpeg", scale = 2)
+
+```
+
+```{r Tidy tables}
+
+library(gtsummary)
+
+theme_gtsummary_compact()
+theme_gtsummary_journal(journal = "lancet")
+
+dat <- Joint_DF %>% 
+  select(ID, Time, Event, Marker, Delta) %>% 
+  tidyr::pivot_wider(id_cols = c(ID, Time, Event),
+                     names_from = Marker, values_from = Delta) 
+
+bad <- dat %>% 
+  dplyr::select(-ID, -Time, -Event) %>% 
+  summarise(dplyr::across(everything(), ~ sd(.x, na.rm = TRUE))) %>% 
+  tidyr::pivot_longer(everything(), names_to = "var", values_to = "sd") %>% 
+  filter(!is.finite(sd) | sd == 0) %>% 
+  pull(var)
+
+dat <- dplyr::select(dat, -dplyr::any_of(bad))
+
+markers <- setdiff(names(dat), c("ID","Time","Event"))
+
+tbl_uni_cox <- tbl_uvregression(data = dat, 
+                                method = survival::coxph,
+                                y = Surv(Time, Event),
+                                include = all_of(markers),
+                                exponentiate = TRUE, 
+                                method.args = list(ties = "efron",
+                                                   control = survival::coxph.control(iter.max = 100, eps = 1e-8)))
 
 ```
 
