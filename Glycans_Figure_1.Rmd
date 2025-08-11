@@ -40,6 +40,7 @@ Top_Glycans_FDR <- FCR_Values_clean %>%
 y_breaks_nadj <- pretty(range(FCR_Values_clean$p_value_log10), n = 3)
 y_breaks_FDR <- pretty(range(FCR_Values_clean$FDR_log10), n = 3)
 
+# write_csv(FCR_Values_clean, file = "~/SLE/Glycans/Output_Data/Figure_1_logFC/Glycans_logFC.csv")
 
 ```
 
