@@ -89,6 +89,8 @@ Cox_Results_Uni_Total <- Joint_DF %>%
 #                           data = Joint_imp, maxit = 200, maxstep = 0.2)
 # 
 
+# write_csv(x = Cox_Results_Uni_Total, file = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Cox_Univariate.csv")
+
 ```
 
 ```{r Perform the Cox regressions - Multivariate}
@@ -132,6 +134,9 @@ Cox_Results_Multi_Total_strict <- Run_multi_cox(Top_Markers_strict)
 
 # Multi_Cox_Firth_Strict <- coxphf(reformulate(Top_Markers_T0_strict, response = "Surv(Time, Event)"), 
 #                           data = Joint_imp, maxit = 200, maxstep = 0.2)
+
+# write_csv(x = Cox_Results_Multi_Total_strict, 
+#           file = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Cox_Multivariate_Sign_Markers.csv")
 
 ```
 
@@ -314,6 +319,9 @@ Joint_DF %>%
 }
 
 Cox_Results_Multi_firth <- Run_multi_coxf(Top_Markers_strict)
+
+# write_csv(x = Cox_Results_Multi_firth,
+#           file = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Cox_Multivariate_Sign_Markers_Firth.csv")
 
 ```
 
@@ -633,4 +641,96 @@ tbl_uni_cox <- tbl_uvregression(data = dat,
 
 ```
 
+
+
+```{r}
+
+Run_multi_coxf2 <- function(Top_Markers) {
+
+  by_comp <- Joint_DF %>%
+    select(ID, Time, Event, Marker, T0, T12, Delta) %>%
+    pivot_longer(cols = -c(ID, Time, Event, Marker),
+                 names_to = "Comparison", values_to = "Value") %>%
+    group_by(Comparison) %>%
+    nest() %>%
+    mutate(Markers = map(Comparison, ~ Top_Markers %>% 
+                           filter(Comparison == .x) %>% 
+                           pull(Marker) %>% 
+                           unique()),
+           Data = map2(data, Markers, ~ .x %>%
+                         filter(Marker %in% .y) %>%
+                         select(ID, Time, Event, Marker, Value) %>%
+                         pivot_wider(id_cols = c(ID, Time, Event),
+                                     names_from = Marker, values_from = Value)),
+           Formula = map(Markers, ~ reformulate(.x, response = "Surv(Time, Event)")),
+           Fit = map2(Formula, Data, ~ coxphf(.x, data = .y, firth = TRUE, maxit = 200, maxstep = 0.2)))
+
+  # tidy results (same as your current function)
+  results <- by_comp %>% 
+    mutate(Tidy = map(Fit, ~ {
+      fit <- .x
+      est <- coef(fit)                         # log-HR
+      term <- names(est)
+      se <- sqrt(diag(vcov(fit)))
+      stat <- est / se
+      lower <- fit$ci.lower                    # already on HR scale
+      upper <- fit$ci.upper                    # already on HR scale
+      pval  <- fit$prob
+      
+      tibble(Marker = term,
+             hazard_ratio_log = est,
+             std.error = se,
+             statistic = stat,
+             p.value = pval,
+             CI_lower = lower,
+             CI_upper = upper)
+    })) %>%
+    select(Comparison, Tidy, Fit) %>%
+    unnest(Tidy) %>%
+    group_by(Comparison) %>%
+    mutate(FDR = p.adjust(p.value, method = "fdr")) %>%
+    ungroup() %>%
+    mutate(Model = "Firth penalised")
+
+  # return both
+  list(results = results, fits = by_comp %>% select(Comparison, Fit))
+}
+
+Cox_multi_firth <- Run_multi_coxf2(Top_Markers_strict)
+Cox_Results_Multi_firth <- Cox_multi_firth$results
+Cox_Fits_Multi_firth <- Cox_multi_firth$fits
+
+```
+
+```{r}
+
+library(gtsummary)
+theme_gtsummary_compact()
+theme_gtsummary_journal("lancet")
+
+```
+
+
+```{r}
+
+## use your existing fit
+fit_delta <- Cox_Fits_Multi_firth %>% dplyr::filter(Comparison=="Delta") %>% dplyr::pull(Fit) %>% .[[1]]
+fit_delta <- attach_inputs(fit_delta, "Delta")  # from your helpers; just to compute N below
+
+# wrap tidy_fun so extra args are harmless
+tidy_wrap <- function(x, ...) tidy_coxphf(x, ...)
+
+tbl_delta <- gtsummary::tbl_regression(
+  fit_delta,
+  exponentiate = TRUE,
+  tidy_fun = tidy_wrap,   # <— use the wrapper
+  estimate_fun = ~gtsummary::style_ratio(.x, digits = 2),
+  pvalue_fun = ~gtsummary::style_pvalue(.x, digits = 2)
+) %>%
+  gtsummary::add_q(method = "fdr") %>%
+  gtsummary::modify_fmt_fun(q.value ~ gtsummary::style_pvalue(digits = 2)) %>%
+  gtsummary::modify_header(gtsummary::all_stat_cols() ~ "**HR (95% CI)**") %>%
+  gtsummary::add_n(location = "header") %>%
+  gtsummary::modify_caption("**Multivariable Cox with Firth (Delta)**")
+```
 
