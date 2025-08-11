@@ -85,6 +85,9 @@ max_len_Delta <- Correlations_Delta_Sign %>%
 Correlations_Delta_Sign_2 <- Correlations_Delta_Sign %>% 
   mutate(Marker = str_pad(Marker, width = max_len_Delta, side = "left", pad = "\u00A0")) 
 
+# write_csv(Correlations_Delta, 
+#           file = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Glycan_Delta_Clinical_Delta_Correlations.csv")
+
 # write_xlsx(Correlations_Delta, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Indices_Correlation.xlsx")
 
 Correlations_Delta_Sign_plot <- ggplot(Correlations_Delta_Sign_2, aes(x = Comparator, y = Marker, fill = Correlation)) +
@@ -156,6 +159,9 @@ Glycan_Deltas_vs_M12_Cor <- expand_grid(Marker = colnames(Glycan_Deltas),
   rename(Correlation = "rho") %>% 
   mutate(Significance = case_when(p.value < 0.05 ~ "*"), 
          Comparator = factor(Comparator, levels = c("AI", "CI", "eGFR", "UPCR", "SLEDAI-2K")))
+
+# write_csv(Glycan_Deltas_vs_M12_Cor,
+#           file = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Glycan_Delta_Clinical_Month12_Correlations.csv")
 
 ```
 
@@ -281,6 +287,9 @@ Delta_Hist_Cor_T12 <- compute_Delta_Hist_Cor(Delta_Hist_T12, "12")
 
 Delta_Hist_Cor_Res <- rbind(Delta_Hist_Cor_T0, Delta_Hist_Cor_T12) %>% 
   inner_join(Category_Data, by = c("Histology" = "Result"))
+
+# write_csv(Delta_Hist_Cor_Res,
+#           file = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Glycan_Delta_NIH_Correlations.csv")
 
 ```
 
