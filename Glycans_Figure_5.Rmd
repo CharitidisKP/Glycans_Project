@@ -92,7 +92,7 @@ Reg_Results_Basic_stats <- Reg_Results_Basic %>%
          CI_upper = estimate + 1.96 * std.error, 
          Significance = if_else(p.value < 0.05, "Significant", "Not Significant"))
 
-# write_csv(Reg_Results_Basic, file = "~/SLE/Glycans/Output_Data/GLM_results_normal.csv")
+# write_csv(Reg_Results_Basic, file = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/GLM_normal.csv")
 
 ```
 
@@ -152,7 +152,7 @@ Reg_Results_Firth_stats <- Reg_Results_Firth %>%
          CI_upper = estimate + 1.96 * std.error, 
          Significance = if_else(p.value < 0.05, "Significant", "Not Significant"))
 
-# write_csv(Reg_Results_Firth, file = "~/SLE/Glycans/Output_Data/GLM_results_firth.csv")
+# write_csv(Reg_Results_Firth, file = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/GLM_Firth.csv")
 
 ```
 
