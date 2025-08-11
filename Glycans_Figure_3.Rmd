@@ -117,7 +117,7 @@ NIH_Corr_Res_Sign_only_Clean <- NIH_Corr_Res_Sign_only %>%
          Category = factor(Category, levels = c("NIH_AI", "NIH_CI")),
          Category = gsub("_", " ", Category)) 
 
-# write_csv(NIH_Corr_Res_Sign_only, file = "~/SLE/Glycans/Output_Data/Histology_Marker_Correlations.csv")
+# write_csv(NIH_Corr_Res_Sign_only, file = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Glycan_NIH_Correlations.csv")
 
 ```
 
