@@ -64,7 +64,8 @@ Correlation_Results_Clean <-  Correlation_Results_Total %>%
          Comparison = factor(Comparison, levels = c("Baseline vs Baseline", "Month 12 vs Month 12", "Baseline vs Month 12"))) %>% 
   rename(Correlation = "estimate")
   
-# write_csv(Correlation_Results_Clean, file = "~/SLE/Glycans/Output_Data/Glycan_Comp_Correlations.csv")
+# write_csv(Correlation_Results_Clean, 
+#           file = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Glycan_Clinical_Correlations.csv")
 
 ```
 
