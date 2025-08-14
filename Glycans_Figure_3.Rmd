@@ -213,7 +213,8 @@ Main_plot_current_combined <- ggplot(NIH_Corr_Res_Sign_only_Clean_2, aes(x = Res
     facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y") +
     scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
     scale_y_discrete(expand = c(0, 0)) +
-    geom_text(aes(label = Significance, vjust = 0.7, hjust = 0.5, fontface = "bold")) +
+    geom_text(aes(label = Significance), vjust = 0.7, hjust = 0.5, fontface = "bold", size = 7) +
+  ## Again, vjust is behaving wierd. Mosat likely due to scale = 2 ##
     labs(title = paste0("Heatmap of marker - clinical/histopathological feature correlations"), x = NULL, y = NULL, 
          caption = paste0("Only markers with significant Wilcoxon test results are shown")) +
     theme_minimal(base_size = 12, base_family = "sans") +
