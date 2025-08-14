@@ -72,7 +72,7 @@ Correlation_Results_Clean <-  Correlation_Results_Total %>%
 ```{r Correlations visualisation}
 
 ## Load the file in case you dont want to run the analysis ##
-Correlation_Results_Clean <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycan_Comp_Correlations.csv")
+Correlation_Results_Clean <- read_csv(file = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Glycan_Clinical_Correlations.csv")
 
 ## Visualise the heatmap ##
 Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, fill = Correlation)) +
@@ -85,7 +85,7 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
              labeller = labeller(Origin = function(x) 
                ifelse(x == "Serum", "Serum<br>Proteome", x))) +
   # geom_text(aes(label = round(Correlation, 2)), size = 3) +
-  geom_text(aes(label = Significance, vjust = 0, hjust = 0.5, fontface = "bold")) +
+  geom_text(aes(label = Significance, vjust = 0, hjust = 0.5, fontface = "bold", size = 4.5)) +
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
@@ -117,15 +117,27 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
 ```
 
 ```{r Correlation plots by Origin}
-# 
-# Correlation_Results_Clean_Sign <- Correlation_Results_Clean %>%
-#   group_by(Marker) %>% 
-#   filter(any(Significance == "*")) %>% 
-#   ungroup()
-# 
-# Cor_Range <- Correlation_Results_Clean_Sign %>% 
-#   summarise(min_corr = min(Correlation, na.rm = TRUE), 
-#             max_corr = max(Correlation, na.rm = TRUE))
+
+Correlation_Results_Clean_Sign <- Correlation_Results_Clean %>%
+  group_by(Marker) %>%
+  filter(any(Significance == "*")) %>%
+  ungroup()
+
+Cor_Range <- Correlation_Results_Clean_Sign %>%
+  summarise(min_corr = min(Correlation, na.rm = TRUE),
+            max_corr = max(Correlation, na.rm = TRUE))
+
+Correlation_Results_Clean_Sign <- Correlation_Results_Clean_Sign %>% 
+  separate(col = Marker, into = c("Origin", "Marker"), sep = "_", extra = "merge", fill = "right") 
+
+max_len <- Correlation_Results_Clean_Sign %>%
+  pull(Marker) %>%
+  nchar() %>%
+  max(na.rm = TRUE)
+
+Correlation_Results_Clean_Sign <- Correlation_Results_Clean_Sign %>% 
+  mutate(Marker = str_pad(Marker, width = max_len, side = "left", pad = "\u00A0")) 
+
 # 
 # Sub_Correlation_plots <- function(orig) {
 # 
@@ -213,7 +225,9 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
              labeller = labeller(Origin = function(x) 
                ifelse(x == "Serum", "Serum<br>proteome", x))) +
   # geom_text(aes(label = round(Correlation, 2)), size = 3) +
-  geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
+  geom_text(aes(label = Significance), vjust = 0.8, hjust = 0.5, fontface = "bold", size = 7) +
+  ## For some god forsaken reason they are aligned properly on the y axis with ##
+  ## vjust = 0.8 when using scale = 2. If scale = 1 try either 0.8 or 0.5 ##
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
   scale_x_discrete(labels = function(x) {
     x <- gsub("_", " ", x)
@@ -237,8 +251,8 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
         plot.caption = element_markdown(hjust = 0.9, vjust = 1),
         plot.title = element_text(face = "bold"))
 
-# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant_A4.jpeg",
-#        plot = Main_plot, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
+ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant_A4.jpeg",
+       plot = Main_plot, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
 
 ```
 
