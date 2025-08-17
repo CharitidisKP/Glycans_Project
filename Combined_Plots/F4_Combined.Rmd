@@ -149,8 +149,6 @@ Glycan_Deltas_vs_M12_Cor_Sign_plot <- ggplot(Glycan_Deltas_vs_M12_Cor_Sign_2, ae
 
 ```
 
-
-
 ```{r Fix each plot again - Marker deltas vs Histologies}
 
 Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
@@ -179,13 +177,22 @@ Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
                                                 title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
     facet_grid(Origin ~ Category, scales = "free", space = "free") +
     scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
-    scale_y_discrete(expand = c(0, 0)) +
+    # scale_y_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = expansion(add = 0.8)) +
     geom_text(aes(label = Significance), vjust = 0.7, hjust = 0.5, fontface = "bold", size = 7) +
     labs(title = paste0("Glycan deltas compared to clinical/histopathological ", Title , " values"), 
          x = NULL, y = NULL) +
     theme_minimal(base_size = 11, base_family = "sans") +
     theme(strip.placement = "outside",
-          strip.text.y.right = element_markdown(size = 11, angle = 0, hjust = 0, vjust = 0.5, face  = "bold"),
+          strip.text.y.right = element_markdown(size = 11, 
+                                                angle = 0, 
+                                                hjust = 0.5, 
+                                                vjust = 0.5, 
+                                                face = "bold", 
+                                                margin = margin(t = 3,
+                                                                r = 3, 
+                                                                b = 3, 
+                                                                l = 3)),
           strip.text.x.top = element_markdown(size = 11, angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
           axis.text.x = element_markdown(size = 11, angle = 60, hjust = 1, vjust = 1, 
                                          # face = "bold", 
@@ -233,8 +240,8 @@ Gabagool <- Gabagool & theme(plot.tag = element_markdown(color = "black", face =
                              axis.text.y = element_markdown(margin = margin(5)),
                              strip.text.y.right = element_markdown(hjust = 0, vjust = 0.5))
 
-# ggsave(plot = Gabagool,
-#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_Corr_Combined_A4.jpeg",
-#        width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
+ggsave(plot = Gabagool,
+       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_Corr_Combined_A4_2.jpeg",
+       width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
 
 ```
