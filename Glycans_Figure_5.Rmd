@@ -596,10 +596,16 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
     distinct() %>% 
     pull() 
 
+  Label_df <- if (Method == "T0") {
+    DF_Plot %>% filter(Significance == "Significant")
+  } else {
+    DF_Plot %>% filter(Highlight == "Significant in both<br>response types")
+  }
+  
   Double_sign_Plot <- ggplot(DF_Plot, aes(x = log10(OR), y = -log10(p.value))) +
     # geom_point(data = legend_df, aes(x = log10(OR), y = -log10(p.value), size = 0)) +
     geom_point(data = DF_Plot, aes(color = Highlight, alpha = Significance), size = 2, show.legend = TRUE) +
-    geom_text_repel(data = DF_Plot %>% filter(Highlight == "Significant in both<br>response types"), 
+    geom_text_repel(data = Label_df, 
                     aes(label = Label), 
                     color = "black", 
                     size = 4, 
@@ -677,8 +683,8 @@ Yeet <- wrap_plots(Double_T0, Double_M12, Double_delta,
 
 Yeet <- Yeet & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
 
-ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta_2.jpeg",
-       plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta_A4.jpeg",
+#        plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
 
 ```
 

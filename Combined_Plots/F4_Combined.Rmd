@@ -240,8 +240,8 @@ Gabagool <- Gabagool & theme(plot.tag = element_markdown(color = "black", face =
                              axis.text.y = element_markdown(margin = margin(5)),
                              strip.text.y.right = element_markdown(hjust = 0, vjust = 0.5))
 
-ggsave(plot = Gabagool,
-       filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_Corr_Combined_A4_2.jpeg",
-       width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
+# ggsave(plot = Gabagool,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_Corr_Combined_A4.jpeg",
+#        width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
 
 ```

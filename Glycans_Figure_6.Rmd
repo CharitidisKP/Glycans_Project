@@ -725,8 +725,7 @@ tbl_delta <- gtsummary::tbl_regression(
   exponentiate = TRUE,
   tidy_fun = tidy_wrap,   # <— use the wrapper
   estimate_fun = ~gtsummary::style_ratio(.x, digits = 2),
-  pvalue_fun = ~gtsummary::style_pvalue(.x, digits = 2)
-) %>%
+  pvalue_fun = ~gtsummary::style_pvalue(.x, digits = 2)) %>%
   gtsummary::add_q(method = "fdr") %>%
   gtsummary::modify_fmt_fun(q.value ~ gtsummary::style_pvalue(digits = 2)) %>%
   gtsummary::modify_header(gtsummary::all_stat_cols() ~ "**HR (95% CI)**") %>%
