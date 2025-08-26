@@ -13,6 +13,7 @@ library(broom)
 library(coxphf)
 library(ggtext)
 library(timereg)
+library(writexl)
 
 ```
 
@@ -89,7 +90,10 @@ Cox_Results_Uni_Total <- Joint_DF %>%
 #                           data = Joint_imp, maxit = 200, maxstep = 0.2)
 # 
 
-# write_csv(x = Cox_Results_Uni_Total, file = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Cox_Univariate.csv")
+# write_csv(x = Cox_Results_Uni_Total, file = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Cox_Univariable.csv")
+
+# write_xlsx(x = Cox_Results_Uni_Total,
+#            path = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Univariable.xlsx")
 
 ```
 
@@ -179,8 +183,8 @@ Plot_Cox_Results <- function(Plot, Type, Filter) {
 
 }
 
-Cox_Uni_plot <- Plot_Cox_Results(Cox_Results_Uni_Total, "Univariate", Filter = TRUE)
-Cox_Multi_plot <- Plot_Cox_Results(Cox_Results_Multi_Total_strict, "Multivariate", Filter = FALSE)
+Cox_Uni_plot <- Plot_Cox_Results(Cox_Results_Uni_Total, "Univariable", Filter = TRUE)
+Cox_Multi_plot <- Plot_Cox_Results(Cox_Results_Multi_Total_strict, "Multivariable", Filter = FALSE)
 
 # ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Cox_Uni_Sign.jpeg", 
 #        plot = Cox_Uni_plot, height = 10, width = 15, dpi = 300, device = "jpeg")
@@ -211,7 +215,7 @@ Cox_Multi_plot <- Plot_Cox_Results(Cox_Results_Multi_Total_strict, "Multivariate
                        name = "Glycan values tested for<br>the cox regression") +
       scale_x_log10(limits = c(0.2, 5), oob = oob_squish) +
       facet_grid(Origin ~ ., scales = "free_y", space = "free_y") +
-      labs(title = "Multivariate Cox regression: Hazard ratios with 95% CI", 
+      labs(title = "Multivariable Cox regression: Hazard ratios with 95% CI", 
            caption = "Only markers which were significant in the univariate analysis shown", 
            x = "Hazard ratio") +
       theme_minimal() +
@@ -322,6 +326,9 @@ Cox_Results_Multi_firth <- Run_multi_coxf(Top_Markers_strict)
 
 # write_csv(x = Cox_Results_Multi_firth,
 #           file = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Cox_Multivariate_Sign_Markers_Firth.csv")
+
+# write_xlsx(x = Cox_Results_Multi_firth,
+#            path = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Multivariable_Sign_Markers_Firth.xlsx")
 
 ```
 
@@ -556,7 +563,7 @@ Cox_Multi_firth_plot2 <- Cox_Results_Multi_firth_clean %>%
   scale_x_log10() +
   scale_y_discrete(drop = FALSE) +
   facet_grid(Origin ~ ., scales = "free_y", space = "free_y", drop = FALSE) +
-  labs(title = "Multivariate Cox regression - Firth penalised: Hazard ratios with 95% CI", 
+  labs(title = "Multivariable Cox regression - Firth penalised: Hazard ratios with 95% CI", 
        caption = paste0("Only markers which were significant in the non-penalised univariate analysis shown
                         <br>T0 and T12 values did not converge and were ommited"),
        x = "Hazard ratio") +
