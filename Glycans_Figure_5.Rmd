@@ -11,7 +11,7 @@ library(ggplot2)
 library(logistf) ## Firth’s logistf() ##
 library(glmnet) ## Penalised regression ##
 library(patchwork)
-
+library(writexl)
 library(ggtext)
 library(ggrepel)
 
@@ -142,8 +142,8 @@ Reg_Results_Firth <- Models_DF %>%
   ungroup() %>% 
   select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
 
-Reg_Results_Firth_stats %>% 
-  filter(p.value < 0.05)
+# Reg_Results_Firth_stats %>% 
+#   filter(p.value < 0.05)
 
 Reg_Results_Firth_stats <- Reg_Results_Firth %>% 
   mutate(OR = exp(estimate), 
@@ -153,6 +153,22 @@ Reg_Results_Firth_stats <- Reg_Results_Firth %>%
          Significance = if_else(p.value < 0.05, "Significant", "Not Significant"))
 
 # write_csv(Reg_Results_Firth, file = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/GLM_Firth.csv")
+
+## Save separately as excel files ##
+# Reg_Results_Firth_stats %>%
+#   filter(Model == "T0") %>%
+#   write_xlsx(x = .,
+#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Baseline.xlsx")
+# 
+# Reg_Results_Firth_stats %>%
+#   filter(Model == "T12") %>%
+#   write_xlsx(x = .,
+#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Month12.xlsx")
+# 
+# Reg_Results_Firth_stats %>%
+#   filter(Model == "Delta") %>%
+#   write_xlsx(x = .,
+#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Delta.xlsx")
 
 ```
 
