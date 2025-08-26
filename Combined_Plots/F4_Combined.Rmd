@@ -245,3 +245,25 @@ Gabagool <- Gabagool & theme(plot.tag = element_markdown(color = "black", face =
 #        width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
 
 ```
+
+```{r Save the excels}
+# Correlations_Delta_Sign_2, Glycan_Deltas_vs_M12_Cor_Sign_2, Delta_Hist_Cor_Res_Sign_2
+
+# write_xlsx(x = Correlations_Delta_Sign_2,
+#            path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_Clinical_Delta_Correlations.xlsx")
+# 
+# write_xlsx(x = Glycan_Deltas_vs_M12_Cor_Sign_2,
+#            path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_Clinical_M12_Correlations.xlsx")
+# 
+# Delta_Hist_Cor_Res_Sign_2 %>% 
+#   filter(Time_label == "0") %>% 
+#   write_xlsx(x = .,
+#            path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_NIH_Baseline_Correlations.xlsx")
+# 
+# Delta_Hist_Cor_Res_Sign_2 %>% 
+#   filter(Time_label == "12") %>% 
+#   write_xlsx(x = .,
+#            path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_NIH_Month12_Correlations.xlsx")
+
+```
+
