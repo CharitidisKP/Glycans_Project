@@ -72,7 +72,7 @@ Correlation_Results_Clean <-  Correlation_Results_Total %>%
 ```{r Correlations visualisation}
 
 ## Load the file in case you dont want to run the analysis ##
-Correlation_Results_Clean <- read_csv(file = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Glycan_Clinical_Correlations.csv")
+Correlation_Results_Clean <- read_csv(file = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Figure_2_Glycan_Clinical_Correlations.csv")
 
 ## Visualise the heatmap ##
 Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, fill = Correlation)) +
@@ -251,8 +251,26 @@ Main_plot <- ggplot(Correlation_Results_Clean_Sign, aes(x = Comparator, y = Mark
         plot.caption = element_markdown(hjust = 0.9, vjust = 1),
         plot.title = element_text(face = "bold"))
 
-ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant_A4.jpeg",
-       plot = Main_plot, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
+# write_xlsx(x = Correlation_Results_Clean_Sign,
+#            path = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Figure_2_Glycan_Clinical_Correlations.xlsx")
+
+# Correlation_Results_Clean_Sign %>% 
+#   filter(Comparison == "Baseline vs Baseline") %>% 
+#   write_xlsx(x = ., 
+#              path = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Figure_2_Glycan_Clinical_Correlations_BvsB.xlsx")
+
+# Correlation_Results_Clean_Sign %>% 
+#   filter(Comparison == "Month 12 vs Month 12") %>% 
+#   write_xlsx(x = ., 
+#              path = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Figure_2_Glycan_Clinical_Correlations_M12vsM12.xlsx")
+
+# Correlation_Results_Clean_Sign %>% 
+#   filter(Comparison == "Baseline vs Month 12") %>% 
+#   write_xlsx(x = ., 
+#              path = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Figure_2_Glycan_Clinical_Correlations_BvsM12.xlsx")
+
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant_A4.jpeg",
+#        plot = Main_plot, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
 
 ```
 
