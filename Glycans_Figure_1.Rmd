@@ -5,6 +5,7 @@ library(tidyverse)
 library(ggtext)
 library(ggplot2)
 library(ggrepel)
+library(writexl)
 
 Pallete <- c("coral1", "deeppink3", "midnightblue", "cyan3", "mediumspringgreen", "yellow3")
 
@@ -44,6 +45,8 @@ y_breaks_nadj <- pretty(range(FCR_Values_clean$p_value_log10), n = 3)
 y_breaks_FDR <- pretty(range(FCR_Values_clean$FDR_log10), n = 3)
 
 # write_csv(FCR_Values_clean, file = "~/SLE/Glycans/Output_Data/Figure_1_logFC/Glycans_logFC.csv")
+# write_xlsx(x = FCR_Values_clean, 
+#            path = "~/SLE/Glycans/Output_Data/Figure_1_logFC/Figure_1_Glycans_volcano.xlsx")
 
 ```
 
@@ -134,7 +137,7 @@ Volcano_FDR <- ggplot(FCR_Values_clean, aes(x = log2FC, y = FDR_log10)) +
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_nadj.jpeg"),
 #        plot = Volcano_nadj, width = 10, height = 8, dpi = 300, device = "jpeg")
 # 
-ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR_all_glycans_font12.jpeg"),
-       plot = Volcano_FDR, width = 10, height = 8, dpi = 300, device = "jpeg")
+# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR_all_glycans_font12.jpeg"),
+#        plot = Volcano_FDR, width = 10, height = 8, dpi = 300, device = "jpeg")
 
 ```
