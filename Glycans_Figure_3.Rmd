@@ -235,5 +235,23 @@ Main_plot_current_combined <- ggplot(NIH_Corr_Res_Sign_only_Clean_2, aes(x = Res
 # ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_3_Correlations_NIH/Correlations_NIH_Combined_A4.jpeg",
 #        plot = Main_plot_current_combined, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
 
+## Save the excels ##
+# write_xlsx(x = NIH_Corr_Res_Sign_only_Clean_2,
+#            path = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Figure_3_Glycan_NIH_Correlations.xlsx")
+
+# NIH_Corr_Res_Sign_only_Clean_2 %>%
+#   filter(Comparison == "Baseline vs Baseline") %>%
+#   write_xlsx(x = .,
+#              path = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Figure_3_Glycan_NIH_Correlations_BvsB.xlsx")
+# 
+# NIH_Corr_Res_Sign_only_Clean_2 %>%
+#   filter(Comparison == "Month 12 vs Month 12") %>%
+#   write_xlsx(x = .,
+#              path = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Figure_3_Glycan_NIH_Correlations_M12vsM12.xlsx")
+# 
+# NIH_Corr_Res_Sign_only_Clean_2 %>%
+#   filter(Comparison == "Baseline vs Month 12") %>%
+#   write_xlsx(x = .,
+#              path = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Figure_3_Glycan_NIH_Correlations_BvsM12.xlsx")
 ```
 
