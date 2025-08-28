@@ -7,6 +7,7 @@ library(purrr)
 library(broom)
 library(ggtext)
 library(ggplot2)
+library(writexl)
 
 ```
 
@@ -150,7 +151,6 @@ Test_Results <- bind_rows(Test_Results, .id = "Origin")
 ```
 
 ```{r Combine the direction with the tests}
-
 Results_Total <- Test_Results %>% inner_join(Directions, by = c("Origin", "Marker"))
 
 Dataframes_Final <- imap(
@@ -168,5 +168,32 @@ Dataframes_Final_Sign <- Dataframes_Final %>%
 
 # write_csv(Dataframes_Final, file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_total.csv")
 # write_csv(Dataframes_Final_Sign, file = "~/SLE/Glycans/Output_Data/Glycans_marker_data_sign.csv")
+
+```
+
+
+```{r Get the glycosylation dataframe for each glycan}
+
+Glycosylation_Data <- Dataframes_Final %>% 
+  select(Origin, Marker) %>% 
+  distinct() %>% 
+  mutate(Marker = gsub(pattern = "^[^_]+_", replacement = "", x = Marker)) %>% 
+  mutate(Glycosylation_Site = str_extract(Marker, "^[IVXLCDM]+"),
+         Protein = str_match(Marker, "^[IVXLCDM]+([A-Z0-9]+)N\\d+")[, 2],
+         N = str_match(Marker, "N(\\d+)")[,2] %>% as.integer() %>% replace_na(., 0L),
+         H = str_match(Marker, "H(\\d+)")[,2] %>% as.integer() %>% replace_na(., 0L),
+         S = str_match(Marker, "S(\\d+)")[,2] %>% as.integer() %>% replace_na(., 0L),
+         F = str_match(Marker, "F(\\d+)")[,2] %>% as.integer() %>% replace_na(., 0L), 
+         Glycan_glycowork = if_else(F > 0,
+                                    str_c("HexNAc(", N, ")Hex(", H, ")NeuAc(", S, ")Fuc(", F, ")"),
+                                    str_c("HexNAc(", N, ")Hex(", H, ")NeuAc(", S, ")")), 
+         Glycan_IUPAC = NA_character_,
+         Antennae_Class = NA_character_,  
+         Core_Fucose = NA_character_,
+         Linkage_SialicAcid = NA_character_,
+         Linkage_Gal = NA_character_,  
+         Linkage_Man = NA_character_)
+
+# write_xlsx(x = Glycosylation_Data, path = "~/SLE/Glycans/Output_Data/Glycosylation_Data.xlsx")
 
 ```
