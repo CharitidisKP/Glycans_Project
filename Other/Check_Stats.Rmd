@@ -1,0 +1,36 @@
+```{r Load the libraries}
+library(readxl)
+library(tidyverse)
+# library()
+# library()
+# library()
+# library()
+
+```
+
+```{r}
+
+GLM_Data <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Delta.xlsx")
+HR_Data_Uni <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Univariable.xlsx")
+HR_Data_Multi <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Multivariable_Sign_Markers_Firth.xlsx")
+
+GLM_Data %>% filter(p.value < 0.05)
+HR_Data_Uni %>% filter(p.value < 0.05) 
+HR_Data_Multi %>% filter(p.value < 0.05) 
+
+```
+
+```{r}
+
+Glycosylations <- read_excel("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx") 
+
+Glycosylations %>%
+  mutate(Fucose = F > 0,
+         Compartment = case_when(str_detect(Protein, "IgG.*Fc") ~ "IgG_Fc",
+                                 str_detect(Protein, "IgG.*Fab") ~ "IgG_Fab", 
+                                 TRUE ~ Protein)) %>%
+  select(Marker, Protein, Glycosylation_Site, Compartment, N, H, S, F, Fucose, Antennae_Class)
+
+
+```
+
