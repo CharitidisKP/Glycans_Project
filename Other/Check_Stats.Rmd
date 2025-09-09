@@ -34,3 +34,13 @@ Glycosylations %>%
 
 ```
 
+```{r}
+
+Glycosylations <- read_excel("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx")
+
+Glycosylations %>% 
+  filter(Significant_HRs_Uni_Deltas == "Yes")
+```
+
+
+
