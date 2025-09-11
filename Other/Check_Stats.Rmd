@@ -42,5 +42,21 @@ Glycosylations %>%
   filter(Significant_HRs_Uni_Deltas == "Yes")
 ```
 
+```{r}
+
+Glycan_Annotations <- Glycosylations %>% 
+  select(Origin, Marker, N, H, S, F) %>% 
+  mutate(.multiple = (!is.na(N) & N == 0) | (!is.na(H) & H == 0), 
+         Glycan_Annotation = case_when(.multiple ~ paste0(Marker, " - Multiple Structures"), 
+         TRUE ~ paste0(if_else(!is.na(N) & N > 0, paste0("N", N), ""), 
+                       if_else(!is.na(H) & H > 0, paste0("H", H), ""), 
+                       if_else(S > 0, paste0("S", S), ""), 
+                       if_else(F > 0, paste0("F", F), "")))) %>% 
+  select(-.multiple)
+
+write_xlsx(x = Glycan_Annotations, path = "~/SLE/Glycans/Output_Data/Gl_annotations.xlsx")
+
+```
+
 
 
