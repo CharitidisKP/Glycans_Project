@@ -15,6 +15,7 @@ Pallete <- c("coral1", "deeppink3", "midnightblue", "cyan3", "mediumspringgreen"
 
 FCR_Values <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycans_logfc.csv")
 Test_Results <- read_csv(file = "~/SLE/Glycans/Output_Data/Glycans_test_results.csv")
+Glycan_Annotations <- read_xlsx("~/SLE/Glycans/Output_Data/Gl_annotations.xlsx")
 
 ```
 
@@ -38,7 +39,19 @@ Top_Glycans_FDR <- FCR_Values_clean %>%
   arrange(FDR) %>% 
   head(25)
 
+Glycan_Annotations_2 <- Glycan_Annotations %>%
+  # make a base marker by removing a trailing underscore + letters (e.g., _a, _b, _d)
+  mutate(Marker_base = str_remove(Marker, "_[A-Za-z]+$")) %>%
+  arrange(Origin, Marker_base, N, H, S, F) %>%     # nice ordering of annotations
+  group_by(Origin, Marker_base) %>%
+  summarise(Glycan_Annotation = str_c(unique(na.omit(Glycan_Annotation)), 
+                                      collapse = " / "),
+            .groups = "drop") %>%
+  rename(Marker = Marker_base) %>% 
+  mutate(Origin = recode(Origin, Serum = "Serum<br>proteome", .default = Origin))
+
 Sign_Glycans_FDR_total <- FCR_Values_clean %>% 
+  inner_join(Glycan_Annotations_2, by = c("Origin", "Marker")) %>% 
   filter(FDR < 0.05)
 
 y_breaks_nadj <- pretty(range(FCR_Values_clean$p_value_log10), n = 3)
@@ -49,6 +62,7 @@ y_breaks_FDR <- pretty(range(FCR_Values_clean$FDR_log10), n = 3)
 #            path = "~/SLE/Glycans/Output_Data/Figure_1_logFC/Figure_1_Glycans_volcano.xlsx")
 
 ```
+
 
 ```{r Volcano visualisation}
 
@@ -125,7 +139,7 @@ Volcano_FDR <- ggplot(FCR_Values_clean, aes(x = log2FC, y = FDR_log10)) +
           plot.caption = element_markdown(hjust = 0.9, vjust = 1),
           panel.grid.major = element_line(color = "grey90"),
           panel.grid.minor = element_blank()) +
-  geom_text_repel(data = Sign_Glycans_FDR_total, aes(label = Marker), 
+  geom_text_repel(data = Sign_Glycans_FDR_total, aes(label = Glycan_Annotation), 
                   size = 3, 
                   force = 2,
                   box.padding = 0.3, 
@@ -137,7 +151,7 @@ Volcano_FDR <- ggplot(FCR_Values_clean, aes(x = log2FC, y = FDR_log10)) +
 # ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_nadj.jpeg"),
 #        plot = Volcano_nadj, width = 10, height = 8, dpi = 300, device = "jpeg")
 # 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR_all_glycans_font12.jpeg"),
-#        plot = Volcano_FDR, width = 10, height = 8, dpi = 300, device = "jpeg")
+# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR_all_glycans_new_annot.jpeg"),
+#        plot = Volcano_FDR, scale = 2, width = 10, height = 8, dpi = 300, device = "jpeg")
 
 ```
