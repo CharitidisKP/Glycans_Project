@@ -1,10 +1,8 @@
 ```{r Load the libraries}
 library(readxl)
 library(tidyverse)
-# library()
-# library()
-# library()
-# library()
+library(writexl)
+library(purrr)
 
 ```
 
@@ -54,9 +52,184 @@ Glycan_Annotations <- Glycosylations %>%
                        if_else(F > 0, paste0("F", F), "")))) %>% 
   select(-.multiple)
 
-write_xlsx(x = Glycan_Annotations, path = "~/SLE/Glycans/Output_Data/Gl_annotations.xlsx")
+# write_xlsx(x = Glycan_Annotations, path = "~/SLE/Glycans/Output_Data/Gl_annotations.xlsx")
 
 ```
 
+```{r}
 
+Fig_1_data <- read.csv(file = "~/SLE/Glycans/Output_Data/Figure_1_logFC/Figure_1_Glycans_volcano.csv")
+Fig_2_data <- read.csv(file = "~/SLE/Glycans/Output_Data/Figure_2_Clinical_Cors/Figure_2_Glycan_Clinical_Correlations.csv")
+Fig_3_data <- read.csv(file = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Glycan_NIH_Correlations.csv")
+Fig_4A_data <- read_xlsx(path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_Clinical_Delta_Correlations.xlsx")
+Fig_4B_data <- read_xlsx(path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_Clinical_M12_Correlations.xlsx")
+Fig_4C_data <- read_xlsx(path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_NIH_Baseline_Correlations.xlsx")
+Fig_4D_data <- read_xlsx(path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_NIH_Month12_Correlations.xlsx")
+Fig_5_data <- read.csv(file = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/GLM_Firth.csv")
+Fig_6A_data <- read.csv(file = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Cox_Univariate.csv")
+Fig_6B_data <- read.csv(file = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Cox_Multivariate_Sign_Markers_Firth.csv")
+
+```
+
+```{r}
+## Get only the figure 1 markers of interest ##
+Fig_1_imp <- Fig_1_data %>% 
+  filter(FDR_log10 > 2.5) %>% 
+  select(Origin, Marker, log2FC, FDR)
+
+## Find the figure 2 markers of interest (moi) ##
+Fig_2_moi <- Fig_2_data %>% 
+  filter(Comparator %in% c("AI", "CI", "eGFR") & Significance == "*") %>% 
+  filter(Comparison %in% c("Baseline vs Baseline", "Baseline vs Month 12")) %>% 
+  group_by(Marker, Comparator) %>% 
+  summarise(n_comp = n_distinct(Comparison), .groups = "drop") %>% 
+  filter(n_comp == 2)
+
+## Get the figure 2 markers of interest (moi) ##
+Fig_2_imp <- Fig_2_data %>% 
+  semi_join(Fig_2_moi, by = c("Marker", "Comparator")) %>% 
+  filter(Comparison %in% c("Baseline vs Baseline", "Baseline vs Month 12")) %>% 
+  arrange(Marker, Comparator, Comparison) %>% 
+  select(Marker, Comparator, Comparison, Significance) %>% 
+  separate(Marker, into = c("Origin", "Marker"),
+           sep = "_", remove = TRUE, extra = "merge", fill = "right")
+
+## Get the figure 3 markers of interest (moi) ##
+Fig_3_Group1 <- Fig_3_data %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*")) %>% 
+  select(Marker, Result, Comparison, Significance) %>% 
+  filter(Result %in% c("Cellular_crescents", "Fibrous_crescents", 
+                       "Fibrinoid_necrosis_karyorrhexis"),
+         Comparison == "Baseline vs Month 12",
+         Significance == "*") %>% 
+  group_by(Marker, Comparison) %>% 
+  # summarise(n_comp = n_distinct(Comparison), .groups = "drop") %>% 
+  arrange(Marker)
+
+Fig_3_Group2 <- Fig_3_data %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*")) %>% 
+  select(Marker, Result, Comparison, Significance) %>% 
+  filter(Result %in% c("Hyaline_thrombi_wire_loops"),
+         Significance == "*") %>% 
+  group_by(Marker, Comparison) %>% 
+  # summarise(n_comp = n_distinct(Comparison), .groups = "drop") %>% 
+  arrange(Marker)
+
+Fig_3_imp <- rbind(Fig_3_Group1, Fig_3_Group2) %>% 
+  separate(Marker, into = c("Origin", "Marker"),
+           sep = "_", remove = TRUE, extra = "merge", fill = "right")
+
+## Get the figure 4A markers of interest (moi) ##
+Fig_4A_imp <- Fig_4A_data %>% 
+  select(Origin, Marker, Comparator, Significance) %>% 
+  filter(Comparator == "AI", 
+         Significance == "*")
+
+Fig_4B_imp <- Fig_4B_data %>% 
+  select(Origin, Marker, Comparator, Significance) %>% 
+  filter(Comparator %in% c("AI", "CI", "eGFR"), 
+         Significance == "*")
+
+Fig_4C_imp <- Fig_4C_data %>% 
+  select(Origin, Marker, Histology, Significance) %>% 
+  filter(Histology %in% c("Cellular /<br>Fibrocellular<br>crescents", "Fibrinoid<br>necrosis", "Tubular<br>atrophy"), 
+         Significance == "*") %>% 
+  mutate(Histology = str_replace_all(Histology, " /<br>", "/"),
+         Histology = str_replace_all(Histology, "<br>", "_"))
+
+Fig_4D_imp <- Fig_4D_data %>% 
+  select(Origin, Marker, Histology, Significance) %>% 
+  filter(Histology %in% c("Cellular /<br>Fibrocellular<br>crescents", "Tubular<br>atrophy"), 
+         Significance == "*") %>% 
+    mutate(Histology = str_replace_all(Histology, " /<br>", "/"),
+         Histology = str_replace_all(Histology, "<br>", "_"))
+
+Fig_5B_data <- Fig_5_data %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*")) %>% 
+  select(Marker, Outcome, Model, Significance) %>% 
+  filter(Significance == "*", 
+         Model == "T12")
+
+Fig_5B_data_dbl_sign <- Fig_5B_data %>% 
+    group_by(Marker) %>%
+    summarize(clinical_sig = any(Outcome == "Clinical"),
+              histo_sig = any(Outcome == "Histological"),
+              .groups = "drop") %>%
+    filter(clinical_sig & histo_sig) %>% 
+    select(Marker) %>% pull()
+
+Fig_5C_data <- Fig_5_data %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*")) %>% 
+  select(Marker, Outcome, Model, Significance) %>% 
+  filter(Significance == "*", 
+         Model == "Delta")
+
+Fig_5C_data_dbl_sign <- Fig_5C_data %>% 
+    group_by(Marker) %>%
+    summarize(clinical_sig = any(Outcome == "Clinical"),
+              histo_sig = any(Outcome == "Histological"),
+              .groups = "drop") %>%
+    filter(clinical_sig & histo_sig) %>% 
+    select(Marker) %>% pull()
+  
+Fig_5B_imp <- Fig_5B_data %>% 
+    mutate(Highlight = case_when(Marker %in% Fig_5B_data_dbl_sign ~ "Significant in both response types", 
+                                 Significance == "Significant" ~ "Significant in one model",
+                                 TRUE ~ "Not significant")) %>% 
+  filter(Highlight == "Significant in both response types") %>% 
+  separate(Marker, into = c("Origin", "Marker"),
+           sep = "_", remove = TRUE, extra = "merge", fill = "right")
+
+Fig_5C_imp <- Fig_5C_data %>% 
+    mutate(Highlight = case_when(Marker %in% Fig_5C_data_dbl_sign ~ "Significant in both response types", 
+                                 Significance == "Significant" ~ "Significant in one model",
+                                 TRUE ~ "Not significant")) %>% 
+  filter(Highlight == "Significant in both response types") %>% 
+  separate(Marker, into = c("Origin", "Marker"),
+           sep = "_", remove = TRUE, extra = "merge", fill = "right")
+
+Fig_6A_imp <- Fig_6A_data %>% 
+  select(Marker, Comparison, p.value) %>% 
+  filter(p.value < 0.05, 
+         Comparison == "Delta") %>% 
+  separate(Marker, into = c("Origin", "Marker"),
+           sep = "_", remove = TRUE, extra = "merge", fill = "right")
+
+Fig_6B_imp <- Fig_6B_data %>% 
+  select(Marker, Comparison, p.value) %>% 
+  filter(p.value < 0.05, 
+         Comparison == "Delta") %>% 
+  separate(Marker, into = c("Origin", "Marker"),
+           sep = "_", remove = TRUE, extra = "merge", fill = "right")
+
+```
+
+```{r Get the total excel}
+
+Dataframes <- ls(pattern = "^Fig_.*_imp$")
+# Dataframes <- Dataframes[sapply(Dataframes, function(x) inherits(get(x), c("data.frame", "tbl_df")))]
+
+Sheets_imp <- setNames(mget(Dataframes), sub("_imp$", "", Dataframes))
+
+prepare_df <- function(df, flag_name) {
+  df %>%
+    select(Origin, Marker) %>%
+    distinct() %>%
+    mutate(!!flag_name := TRUE)
+}
+
+prepared <- imap(Sheets_imp, prepare_df)
+
+Markers_of_Interest <- reduce(prepared, full_join, by = c("Origin", "Marker")) %>%
+  replace_na(as.list(setNames(rep(FALSE, length(Sheets_imp)), names(Sheets_imp)))) %>%
+  arrange(Origin, Marker) %>% 
+  mutate(Hits = rowSums(across(where(is.logical)), na.rm = TRUE)) %>%
+  arrange(desc(Hits), Origin, Marker) %>% 
+  select(Origin, Marker, Hits, starts_with("Fig_"))
+
+Sheets_imp <- list_modify(Sheets_imp, Markers_of_Interest = Markers_of_Interest)
+
+write_xlsx(Sheets_imp, path = "~/SLE/Glycans/Markers_of_Interest.xlsx")
+
+```
 
