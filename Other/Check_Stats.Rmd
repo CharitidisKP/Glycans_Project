@@ -8,49 +8,50 @@ library(purrr)
 
 ```{r}
 
-GLM_Data <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Delta.xlsx")
-HR_Data_Uni <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Univariable.xlsx")
-HR_Data_Multi <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Multivariable_Sign_Markers_Firth.xlsx")
-
-GLM_Data %>% filter(p.value < 0.05)
-HR_Data_Uni %>% filter(p.value < 0.05) 
-HR_Data_Multi %>% filter(p.value < 0.05) 
-
-```
-
-```{r}
-
-Glycosylations <- read_excel("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx") 
-
-Glycosylations %>%
-  mutate(Fucose = F > 0,
-         Compartment = case_when(str_detect(Protein, "IgG.*Fc") ~ "IgG_Fc",
-                                 str_detect(Protein, "IgG.*Fab") ~ "IgG_Fab", 
-                                 TRUE ~ Protein)) %>%
-  select(Marker, Protein, Glycosylation_Site, Compartment, N, H, S, F, Fucose, Antennae_Class)
-
+# GLM_Data <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Delta.xlsx")
+# HR_Data_Uni <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Univariable.xlsx")
+# HR_Data_Multi <- read_xlsx("~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Multivariable_Sign_Markers_Firth.xlsx")
+# 
+# GLM_Data %>% filter(p.value < 0.05)
+# HR_Data_Uni %>% filter(p.value < 0.05) 
+# HR_Data_Multi %>% filter(p.value < 0.05) 
 
 ```
 
 ```{r}
 
-Glycosylations <- read_excel("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx")
+# Glycosylations <- read_excel("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx") 
+# 
+# Glycosylations %>%
+#   mutate(Fucose = F > 0,
+#          Compartment = case_when(str_detect(Protein, "IgG.*Fc") ~ "IgG_Fc",
+#                                  str_detect(Protein, "IgG.*Fab") ~ "IgG_Fab", 
+#                                  TRUE ~ Protein)) %>%
+#   select(Marker, Protein, Glycosylation_Site, Compartment, N, H, S, F, Fucose, Antennae_Class)
 
-Glycosylations %>% 
-  filter(Significant_HRs_Uni_Deltas == "Yes")
+
 ```
 
 ```{r}
 
-Glycan_Annotations <- Glycosylations %>% 
-  select(Origin, Marker, N, H, S, F) %>% 
-  mutate(.multiple = (!is.na(N) & N == 0) | (!is.na(H) & H == 0), 
-         Glycan_Annotation = case_when(.multiple ~ paste0(Marker, " - Multiple Structures"), 
-         TRUE ~ paste0(if_else(!is.na(N) & N > 0, paste0("N", N), ""), 
-                       if_else(!is.na(H) & H > 0, paste0("H", H), ""), 
-                       if_else(S > 0, paste0("S", S), ""), 
-                       if_else(F > 0, paste0("F", F), "")))) %>% 
-  select(-.multiple)
+# Glycosylations <- read_excel("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx")
+# 
+# Glycosylations %>% 
+#   filter(Significant_HRs_Uni_Deltas == "Yes")
+
+```
+
+```{r}
+
+# Glycan_Annotations <- Glycosylations %>% 
+#   select(Origin, Marker, N, H, S, F) %>% 
+#   mutate(.multiple = (!is.na(N) & N == 0) | (!is.na(H) & H == 0), 
+#          Glycan_Annotation = case_when(.multiple ~ paste0(Marker, " - Multiple Structures"), 
+#          TRUE ~ paste0(if_else(!is.na(N) & N > 0, paste0("N", N), ""), 
+#                        if_else(!is.na(H) & H > 0, paste0("H", H), ""), 
+#                        if_else(S > 0, paste0("S", S), ""), 
+#                        if_else(F > 0, paste0("F", F), "")))) %>% 
+#   select(-.multiple)
 
 # write_xlsx(x = Glycan_Annotations, path = "~/SLE/Glycans/Output_Data/Gl_annotations.xlsx")
 
@@ -190,8 +191,9 @@ Fig_5C_imp <- Fig_5C_data %>%
 
 Fig_6A_imp <- Fig_6A_data %>% 
   select(Marker, Comparison, p.value) %>% 
-  filter(p.value < 0.05, 
-         Comparison == "Delta") %>% 
+  filter(p.value < 0.05 
+         # ,Comparison == "Delta"
+         ) %>% 
   separate(Marker, into = c("Origin", "Marker"),
            sep = "_", remove = TRUE, extra = "merge", fill = "right")
 
@@ -229,7 +231,7 @@ Markers_of_Interest <- reduce(prepared, full_join, by = c("Origin", "Marker")) %
 
 Sheets_imp <- list_modify(Sheets_imp, Markers_of_Interest = Markers_of_Interest)
 
-write_xlsx(Sheets_imp, path = "~/SLE/Glycans/Markers_of_Interest.xlsx")
+# write_xlsx(Sheets_imp, path = "~/SLE/Glycans/Markers_of_Interest.xlsx")
 
 ```
 
