@@ -34,7 +34,7 @@ library(purrr)
 
 ```{r}
 
-# Glycosylations <- read_excel("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx")
+Glycosylations <- read_excel("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx")
 # 
 # Glycosylations %>% 
 #   filter(Significant_HRs_Uni_Deltas == "Yes")
@@ -43,17 +43,30 @@ library(purrr)
 
 ```{r}
 
-# Glycan_Annotations <- Glycosylations %>% 
-#   select(Origin, Marker, N, H, S, F) %>% 
-#   mutate(.multiple = (!is.na(N) & N == 0) | (!is.na(H) & H == 0), 
-#          Glycan_Annotation = case_when(.multiple ~ paste0(Marker, " - Multiple Structures"), 
-#          TRUE ~ paste0(if_else(!is.na(N) & N > 0, paste0("N", N), ""), 
-#                        if_else(!is.na(H) & H > 0, paste0("H", H), ""), 
-#                        if_else(S > 0, paste0("S", S), ""), 
-#                        if_else(F > 0, paste0("F", F), "")))) %>% 
-#   select(-.multiple)
+Glycan_Annotations <- Glycosylations %>%
+  select(Origin, Marker, N, H, S, F, Antennae_Class, Core_Fucose) %>%
+  mutate(.multiple = (!is.na(N) & N == 0) | (!is.na(H) & H == 0),
+         Glycan_Annotation = case_when(.multiple ~ paste0(Marker, " - Multiple Structures"),
+         TRUE ~ paste0(if_else(!is.na(N) & N > 0, paste0("N", N), ""),
+                       if_else(!is.na(H) & H > 0, paste0("H", H), ""),
+                       if_else(S > 0, paste0("S", S), ""),
+                       if_else(F > 0, paste0("F", F), "")))) %>%
+  select(-.multiple)
+
+
+Glycan_Annotations_clean <- Glycan_Annotations %>% 
+  select(Origin, Marker, Glycan_Annotation, Antennae_Class, Core_Fucose) %>% 
+  mutate(Marker_base = str_remove(Marker, "_[A-Za-z]+\\d*$")) %>%
+  arrange(Origin, Marker_base) %>%
+  group_by(Origin, Marker_base) %>%
+  summarise(Glycan_Annotation = str_c(unique(na.omit(Glycan_Annotation)), collapse = " / "),
+            Antennae_Class = str_c(unique(na.omit(Antennae_Class)), collapse = " / "),
+            Core_Fucose = str_c(unique(na.omit(Core_Fucose)), collapse = " / "),
+            .groups = "drop") %>% 
+  rename(Marker = Marker_base)
 
 # write_xlsx(x = Glycan_Annotations, path = "~/SLE/Glycans/Output_Data/Gl_annotations.xlsx")
+# write_xlsx(x = Glycan_Annotations_clean, path = "~/SLE/Glycans/Output_Data/Gl_annotations_clean.xlsx")
 
 ```
 
@@ -232,6 +245,20 @@ Markers_of_Interest <- reduce(prepared, full_join, by = c("Origin", "Marker")) %
 Sheets_imp <- list_modify(Sheets_imp, Markers_of_Interest = Markers_of_Interest)
 
 # write_xlsx(Sheets_imp, path = "~/SLE/Glycans/Markers_of_Interest.xlsx")
+
+```
+
+
+```{r Join the Hits excel with the annotation excel}
+
+Glycan_Annotations_clean <- read_xlsx(path = "~/SLE/Glycans/Output_Data/Gl_annotations_clean.xlsx")
+Glycans_of_Int <- read_xlsx(path = "~/SLE/Glycans/Markers_of_Interest.xlsx", sheet = "Markers_of_Interest")
+
+Glycans_of_Int_annotated <- Glycan_Annotations_clean %>% 
+  inner_join(Glycans_of_Int, by = c("Origin", "Marker")) %>% 
+  select(Origin, Marker, Hits, Glycan_Annotation, Antennae_Class, Core_Fucose)
+
+# write_xlsx(x = Glycans_of_Int_annotated, path = "~/SLE/Glycans/Markers_of_Interest_annotated.xlsx")
 
 ```
 
