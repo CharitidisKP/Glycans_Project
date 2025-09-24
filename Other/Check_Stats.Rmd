@@ -104,14 +104,15 @@ Fig_2_imp <- Fig_2_data %>%
   semi_join(Fig_2_moi, by = c("Marker", "Comparator")) %>% 
   filter(Comparison %in% c("Baseline vs Baseline", "Baseline vs Month 12")) %>% 
   arrange(Marker, Comparator, Comparison) %>% 
-  select(Marker, Comparator, Comparison, Significance) %>% 
+  select(Marker, Comparator, Comparison, Correlation, p.value, Significance) %>% 
   separate(Marker, into = c("Origin", "Marker"),
            sep = "_", remove = TRUE, extra = "merge", fill = "right")
 
 ## Get the figure 3 markers of interest (moi) ##
 Fig_3_Group1 <- Fig_3_data %>% 
-  mutate(Significance = case_when(p.value < 0.05 ~ "*")) %>% 
-  select(Marker, Result, Comparison, Significance) %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*"), 
+         Correlation = estimate) %>% 
+  select(Marker, Result, Comparison, Correlation, p.value, Significance) %>% 
   filter(Result %in% c("Cellular_crescents", "Fibrous_crescents", 
                        "Fibrinoid_necrosis_karyorrhexis"),
          Comparison == "Baseline vs Month 12",
@@ -121,8 +122,9 @@ Fig_3_Group1 <- Fig_3_data %>%
   arrange(Marker)
 
 Fig_3_Group2 <- Fig_3_data %>% 
-  mutate(Significance = case_when(p.value < 0.05 ~ "*")) %>% 
-  select(Marker, Result, Comparison, Significance) %>% 
+  mutate(Significance = case_when(p.value < 0.05 ~ "*"),
+         Correlation = estimate) %>% 
+  select(Marker, Result, Comparison, Correlation, p.value, Significance) %>% 
   filter(Result %in% c("Hyaline_thrombi_wire_loops"),
          Significance == "*") %>% 
   group_by(Marker, Comparison) %>% 
@@ -135,24 +137,24 @@ Fig_3_imp <- rbind(Fig_3_Group1, Fig_3_Group2) %>%
 
 ## Get the figure 4A markers of interest (moi) ##
 Fig_4A_imp <- Fig_4A_data %>% 
-  select(Origin, Marker, Comparator, Significance) %>% 
+  select(Origin, Marker, Comparator, Correlation, p.value, Significance) %>% 
   filter(Comparator == "AI", 
          Significance == "*")
 
 Fig_4B_imp <- Fig_4B_data %>% 
-  select(Origin, Marker, Comparator, Significance) %>% 
+  select(Origin, Marker, Comparator, Correlation, p.value, Significance) %>% 
   filter(Comparator %in% c("AI", "CI", "eGFR"), 
          Significance == "*")
 
 Fig_4C_imp <- Fig_4C_data %>% 
-  select(Origin, Marker, Histology, Significance) %>% 
+  select(Origin, Marker, Histology, Correlation, p.value, Significance) %>% 
   filter(Histology %in% c("Cellular /<br>Fibrocellular<br>crescents", "Fibrinoid<br>necrosis", "Tubular<br>atrophy"), 
          Significance == "*") %>% 
   mutate(Histology = str_replace_all(Histology, " /<br>", "/"),
          Histology = str_replace_all(Histology, "<br>", "_"))
 
 Fig_4D_imp <- Fig_4D_data %>% 
-  select(Origin, Marker, Histology, Significance) %>% 
+  select(Origin, Marker, Histology, Correlation, p.value, Significance) %>% 
   filter(Histology %in% c("Cellular /<br>Fibrocellular<br>crescents", "Tubular<br>atrophy"), 
          Significance == "*") %>% 
     mutate(Histology = str_replace_all(Histology, " /<br>", "/"),
@@ -160,7 +162,7 @@ Fig_4D_imp <- Fig_4D_data %>%
 
 Fig_5B_data <- Fig_5_data %>% 
   mutate(Significance = case_when(p.value < 0.05 ~ "*")) %>% 
-  select(Marker, Outcome, Model, Significance) %>% 
+  select(Marker, Outcome, Model, estimate, statistic, p.value, Significance) %>% 
   filter(Significance == "*", 
          Model == "T12")
 
@@ -174,7 +176,7 @@ Fig_5B_data_dbl_sign <- Fig_5B_data %>%
 
 Fig_5C_data <- Fig_5_data %>% 
   mutate(Significance = case_when(p.value < 0.05 ~ "*")) %>% 
-  select(Marker, Outcome, Model, Significance) %>% 
+  select(Marker, Outcome, Model, estimate, statistic, p.value, Significance) %>% 
   filter(Significance == "*", 
          Model == "Delta")
 
@@ -203,7 +205,9 @@ Fig_5C_imp <- Fig_5C_data %>%
            sep = "_", remove = TRUE, extra = "merge", fill = "right")
 
 Fig_6A_imp <- Fig_6A_data %>% 
-  select(Marker, Comparison, p.value) %>% 
+  mutate(CI_lower = conf.low, 
+         CI_upper = conf.high) %>% 
+  select(Marker, Comparison, p.value, hazard_ratio, CI_lower, CI_upper) %>% 
   filter(p.value < 0.05 
          # ,Comparison == "Delta"
          ) %>% 
@@ -211,7 +215,7 @@ Fig_6A_imp <- Fig_6A_data %>%
            sep = "_", remove = TRUE, extra = "merge", fill = "right")
 
 Fig_6B_imp <- Fig_6B_data %>% 
-  select(Marker, Comparison, p.value) %>% 
+  select(Marker, Comparison, p.value, hazard_ratio, CI_lower, CI_upper) %>% 
   filter(p.value < 0.05, 
          Comparison == "Delta") %>% 
   separate(Marker, into = c("Origin", "Marker"),
@@ -244,7 +248,7 @@ Markers_of_Interest <- reduce(prepared, full_join, by = c("Origin", "Marker")) %
 
 Sheets_imp <- list_modify(Sheets_imp, Markers_of_Interest = Markers_of_Interest)
 
-# write_xlsx(Sheets_imp, path = "~/SLE/Glycans/Markers_of_Interest.xlsx")
+# write_xlsx(Sheets_imp, path = "~/SLE/Glycans/Markers_of_Interest_with_stats.xlsx")
 
 ```
 
