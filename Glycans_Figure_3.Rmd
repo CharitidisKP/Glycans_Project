@@ -192,19 +192,47 @@ plots_by_origin <- map(unique(NIH_Corr_Res_Sign_only_Clean$Origin), Sub_Correlat
 
 ```{r NIH Correlations combined}
 
-max_len_NIH <- NIH_Corr_Res_Sign_only_Clean %>%
-  pull(Marker) %>%
+Glycan_Annotations_clean <- read_xlsx("~/SLE/Glycans/Output_Data/Gl_annotations_clean.xlsx") %>% 
+  mutate(Glycan_Annotation = gsub(pattern = " - Multiple Structures", replacement = "", x = Glycan_Annotation)) %>% 
+  select(Origin, Marker, Glycan_Annotation) 
+
+NIH_Corr_Res_Sign_only_Clean_2 <- NIH_Corr_Res_Sign_only_Clean %>% 
+  inner_join(Glycan_Annotations_clean, by = c("Origin", "Marker"))
+
+max_len <- NIH_Corr_Res_Sign_only_Clean_2 %>%
+  pull(Glycan_Annotation) %>%
   nchar() %>%
   max(na.rm = TRUE)
 
-NIH_Corr_Res_Sign_only_Clean_2 <- NIH_Corr_Res_Sign_only_Clean %>% 
-  arrange(Category, Result) %>% 
-  mutate(Marker = str_pad(Marker, width = max_len_NIH, side = "left", pad = "\u00A0"), 
-         Result = factor(Result, levels = unique(Result)), 
-         Origin = gsub("Serum", "Serum<br>proteome", Origin)) 
-  
+NIH_Corr_Res_Sign_only_Clean_2 <- NIH_Corr_Res_Sign_only_Clean_2 %>% 
+  mutate(Marker = str_pad(Marker, width = max_len, side = "left", pad = "\u00A0"), 
+         Glycan_Annotation = str_pad(Glycan_Annotation, width = max_len, side = "left", pad = "\u00A0")) 
 
-Main_plot_current_combined <- ggplot(NIH_Corr_Res_Sign_only_Clean_2, aes(x = Result, y = Marker, fill = Correlation)) +
+DF <- NIH_Corr_Res_Sign_only_Clean_2 %>%
+  mutate(RowKey = interaction(Marker, Glycan_Annotation, sep = " | ", drop = TRUE, lex.order = TRUE)) %>% 
+  ungroup()
+
+row_levels <- DF %>%
+  arrange(Origin, Comparison, Marker) %>%     
+  pull(RowKey) %>% 
+  unique()
+
+lab_map <- DF %>%
+  distinct(RowKey, Glycan_Annotation) %>%
+  tibble::deframe()
+
+DF <- DF %>%
+  mutate(RowKey = factor(RowKey, levels = row_levels), 
+         Marker = str_pad(Marker, width = max_len, side = "left", pad = "\u00A0"), 
+         Glycan_Annotation = str_pad(Glycan_Annotation, width = max_len, side = "left", pad = "\u00A0"), 
+         RowKey = str_pad(RowKey, width = max_len, side = "left", pad = "\u00A0")) 
+
+```
+
+
+```{r NIH Correlations plot A4}
+
+Main_plot_current_combined <- ggplot(DF, aes(x = Result, y = RowKey, fill = Correlation)) +
     geom_tile(color = "white", width = 1, height = 1) +
     scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
                          midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
@@ -212,7 +240,8 @@ Main_plot_current_combined <- ggplot(NIH_Corr_Res_Sign_only_Clean_2, aes(x = Res
                                                 title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
     facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y") +
     scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
-    scale_y_discrete(expand = c(0, 0)) +
+    # scale_y_discrete(expand = c(0, 0)) +
+    scale_y_discrete(labels = lab_map, drop = TRUE, expand = c(0,0)) +
     geom_text(aes(label = Significance), vjust = 0.7, hjust = 0.5, fontface = "bold", size = 7) +
   ## Again, vjust is behaving wierd. Mosat likely due to scale = 2 ##
     labs(title = paste0("Heatmap of marker - clinical/histopathological feature correlations"), x = NULL, y = NULL, 
@@ -232,7 +261,7 @@ Main_plot_current_combined <- ggplot(NIH_Corr_Res_Sign_only_Clean_2, aes(x = Res
           plot.caption = element_markdown(hjust = 0.9, vjust = 1, lineheight = 1.3),
           plot.title = element_markdown(face = "bold", lineheight = 1.2))
 
-# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_3_Correlations_NIH/Correlations_NIH_Combined_A4.jpeg",
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_3_Correlations_NIH/Correlations_NIH_Combined_Glycans_A4.jpeg",
 #        plot = Main_plot_current_combined, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
 
 ## Save the excels ##
