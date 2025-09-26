@@ -40,6 +40,10 @@ Survival_Data <- Survival_Dataframe %>% group_by(Patients) %>%
     ungroup() %>% 
   rename(ID = Patients)
 
+Glycan_Annotations_clean <- read_xlsx("~/SLE/Glycans/Output_Data/Gl_annotations_clean.xlsx") %>% 
+  mutate(Glycan_Annotation = gsub(" - Multiple Structures", "", Glycan_Annotation)) %>% 
+  select(Origin, Marker, Glycan_Annotation)
+
 ```
 
 ```{r Load glycans and join}
@@ -149,11 +153,14 @@ Cox_Results_Multi_Total_strict <- Run_multi_cox(Top_Markers_strict)
 Plot_Cox_Results <- function(Plot, Type, Filter) {
  Plot %>% 
   separate(Marker, c("Origin", "Marker"), sep = "_", extra = "merge") %>% 
+  inner_join(Glycan_Annotations_clean, by = c("Origin", "Marker")) %>% 
   mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")), 
          Origin = gsub("Serum", "Serum<br>proteome", Origin), 
-         Marker = if_else(p.value < 0.05, paste0("<span style='font-size:18px'>* </span>", Marker), Marker)) %>% 
+         Glycan_Annotation = if_else(p.value < 0.05, 
+                                     paste0("<span style='font-size:18px'>* </span>", Glycan_Annotation),
+                                            Glycan_Annotation)) %>% 
     { if (Filter) filter(., p.value < 0.05) else . } %>% 
-  ggplot(., aes(x = hazard_ratio, y = Marker, colour = Comparison)) +
+  ggplot(., aes(x = hazard_ratio, y = Glycan_Annotation, colour = Comparison)) +
       geom_point(position = position_dodge(0.6), size = 3) +
       geom_errorbarh(aes(xmin = conf.low, xmax = conf.high),
                      position = position_dodge(0.6),
@@ -537,21 +544,31 @@ Multi_model_plot_strict <- Multi_models_delta_clean %>%
 ```
 
 
-```{r Alternative Multivariate Cox visualisation}
+```{r Alternative Multivariate Cox visualisation prep}
 
 Cox_Results_Multi_firth_clean <- Cox_Results_Multi_firth %>% 
   mutate(Annotation = case_when(p.value < 0.05 ~ "Significant", 
                                 is.na(p.value) ~ "Model did not converge",
                                 TRUE ~ "Not significant"))
 
-Cox_Multi_firth_plot2 <- Cox_Results_Multi_firth_clean %>%
+Cox_Results_Multi_firth_clean_2 <- Cox_Results_Multi_firth_clean %>%
   filter(Comparison == "Delta") %>%
   separate(Marker, c("Origin", "Marker"), sep = "_", extra = "merge") %>% 
+  inner_join(Glycan_Annotations_clean, by = c("Origin", "Marker")) %>% 
   mutate(Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")), 
          Origin = gsub("Serum", "Serum<br>proteome", Origin), 
          Marker = factor(Marker, levels = c(unique(Marker))), 
-         Marker = if_else(p.value < 0.05, paste0("<span style='font-size:18px'>* </span>", Marker), Marker)) %>% 
-  ggplot(., aes(x = hazard_ratio, y = Marker, colour = Comparison)) +
+         Glycan_Annotation = if_else(p.value < 0.05, 
+                                     paste0("<span style='font-size:18px'>* </span>", Glycan_Annotation),
+                                     Glycan_Annotation))
+
+```
+
+
+```{r Alternative Multivariate Cox visualisation}
+
+Cox_Multi_firth_plot2 <- ggplot(Cox_Results_Multi_firth_clean_2, 
+                                aes(x = hazard_ratio, y = Glycan_Annotation, colour = Comparison)) +
   geom_point(position = position_dodge(0.6), size = 3, na.rm = TRUE) +
   geom_errorbarh(data = . %>% filter(!is.na(CI_lower) & !is.na(CI_upper)),
                  aes(xmin = CI_lower, xmax = CI_upper),
@@ -610,7 +627,7 @@ Combined_Uni_Multi_firth <- wrap_plots(Cox_Uni_plot, Cox_Multi_firth_plot2, nrow
         plot.title = element_markdown(size = 16, face = "bold"))
 
 # ggsave(plot = Combined_Uni_Multi_firth,
-#        filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Combined_firth.jpeg",
+#        filename = "~/SLE/Glycans/Plots_2/Figure_6_Survival/Combined_firth_Glycans_A4.jpeg",
 #        width = 210, height = 297, units = "mm", dpi = 300, device = "jpeg", scale = 2)
 
 ```
