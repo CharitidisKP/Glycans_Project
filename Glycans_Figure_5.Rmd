@@ -551,6 +551,49 @@ Firth_GLM_Plot2 <- plot_GLM_results2(Reg_Results_Firth_stats, "Firth's penalised
 ```
 
 
+```{r}
+Glycan_Annotations_clean <- read_xlsx("~/SLE/Glycans/Output_Data/Gl_annotations_clean.xlsx") %>% 
+  mutate(Glycan_Annotation = gsub(" - Multiple Structures", "", Glycan_Annotation)) %>% 
+  select(Origin, Marker, Glycan_Annotation) %>% 
+  unite(Marker, c(Origin, Marker), sep = "_", remove = TRUE)
+
+# 1) Wrap your pipeline into a function
+process_DF <- function(df) {
+  df2 <- df %>%
+    inner_join(Glycan_Annotations_clean, by = "Marker")
+  
+  max_len <- df2 %>%
+    pull(Glycan_Annotation) %>%
+    nchar() %>%
+    max(na.rm = TRUE)
+  
+  df2 <- df2 %>% 
+    mutate(Marker = str_pad(Marker, width = max_len, side = "left", pad = "\u00A0"),
+           Glycan_Annotation = str_pad(Glycan_Annotation, width = max_len, side = "left", pad = "\u00A0"))
+  
+  DF <- df2 %>%
+    mutate(RowKey = interaction(Marker, Glycan_Annotation, sep = " | ", drop = TRUE, lex.order = TRUE)) %>%
+    ungroup()
+  
+  row_levels <- DF %>%
+    arrange(Marker, Outcome, Model) %>%
+    pull(RowKey) %>%
+    unique()
+  
+  lab_map <- DF %>%
+    distinct(RowKey, Glycan_Annotation) %>%
+    tibble::deframe()
+  
+  DF <- DF %>%
+    mutate(RowKey = factor(RowKey, levels = row_levels), 
+           Marker = str_pad(Marker, width = max_len, side = "left", pad = "\u00A0"),
+           Glycan_Annotation = str_pad(Glycan_Annotation, width = max_len, side = "left", pad = "\u00A0"),
+           RowKey = str_pad(as.character(RowKey), width = max_len, side = "left", pad = "\u00A0"))
+  
+  return(list(DF = DF, lab_map = lab_map))
+}
+
+```
 
 
 
@@ -593,7 +636,7 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
                                    clinical_sig & !histo_sig ~ "Significant in<br>clinical response", 
                                    !clinical_sig & histo_sig ~ "Significant in<br>histological response",
                                    TRUE ~ "Not significant"), 
-             Label = gsub("_", " ", Marker), 
+             # Label = gsub("_", " ", Marker), 
              Highlight = factor(Highlight, levels = c("Significant in both<br>response types", 
                                                       "Significant in<br>clinical response",
                                                       "Significant in<br>histological response",
@@ -611,18 +654,53 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
     select(Marker) %>% 
     distinct() %>% 
     pull() 
-
+  
+  DF_Plot <- DF_Plot %>%
+    inner_join(Glycan_Annotations_clean, by = "Marker")
+    
+  
   Label_df <- if (Method == "T0") {
-    DF_Plot %>% filter(Significance == "Significant")
+    DF_Plot %>% 
+        filter(Significance == "Significant") %>% 
+        mutate(Origin = gsub(pattern = "_.*", replacement = "", Marker), 
+               Origin = str_trim(Origin), 
+               Annotation = paste0(Origin, " ", str_trim(Glycan_Annotation)))
   } else {
-    DF_Plot %>% filter(Highlight == "Significant in both<br>response types")
+    DF_Plot %>%
+      filter(Highlight == "Significant in both<br>response types")%>% 
+      mutate(Origin = gsub(pattern = "_.*", replacement = "", Marker), 
+             Origin = str_trim(Origin), 
+             Annotation = paste0(Origin, " ", str_trim(Glycan_Annotation)))
   }
+    
+  max_len <- DF_Plot %>%
+    pull(Glycan_Annotation) %>%
+    nchar() %>%
+    max(na.rm = TRUE)
+  
+  DF_Plot <- DF_Plot %>% 
+    mutate(Marker = str_pad(Marker, width = max_len, side = "left", pad = "\u00A0"),
+           Glycan_Annotation = str_pad(Glycan_Annotation, width = max_len, side = "left", pad = "\u00A0"))
+  
+  DF_Plot <- DF_Plot %>%
+    mutate(RowKey = interaction(Marker, Glycan_Annotation, sep = " | ", drop = TRUE, lex.order = TRUE)) %>%
+    ungroup()
+  
+  row_levels <- DF_Plot %>%
+    arrange(Marker, Outcome, Model) %>%
+    pull(RowKey) %>%
+    unique()
+  
+  lab_map <- DF_Plot %>%
+    distinct(RowKey, Glycan_Annotation) %>%
+    tibble::deframe()
   
   Double_sign_Plot <- ggplot(DF_Plot, aes(x = log10(OR), y = -log10(p.value))) +
     # geom_point(data = legend_df, aes(x = log10(OR), y = -log10(p.value), size = 0)) +
     geom_point(data = DF_Plot, aes(color = Highlight, alpha = Significance), size = 2, show.legend = TRUE) +
     geom_text_repel(data = Label_df, 
-                    aes(label = Label), 
+                    # aes(label = Label), 
+                    aes(label = Label_df$Annotation), 
                     color = "black", 
                     size = 4, 
                     force = 2,
@@ -665,6 +743,7 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
     #   theme(legend.position = "none") }
   
   Double_sign_Plot
+  # DF_Plot
           
 }
 
@@ -699,8 +778,8 @@ Yeet <- wrap_plots(Double_T0, Double_M12, Double_delta,
 
 Yeet <- Yeet & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
 
-# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta_A4.jpeg",
-#        plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
+ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta_Glycans_A4.jpeg",
+       plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
 
 ```
 
