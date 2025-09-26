@@ -248,6 +248,15 @@ Markers_of_Interest <- reduce(prepared, full_join, by = c("Origin", "Marker")) %
 
 Sheets_imp <- list_modify(Sheets_imp, Markers_of_Interest = Markers_of_Interest)
 
+
+Glycosylation_Data_Corrected <- read_xlsx("~/SLE/Glycans/Glycosylation_Data_Corrected.xlsx")
+Markers_of_Interest_annotated <- read_xlsx("~/SLE/Glycans/Markers_of_Interest_annotated.xlsx")
+
+Sheets_imp <- list_modify(Sheets_imp, 
+                          Markers_of_Interest = Markers_of_Interest, 
+                          Annotations = Markers_of_Interest_annotated, 
+                          Glycosylation_Data_Corrected = Glycosylation_Data_Corrected)
+
 # write_xlsx(Sheets_imp, path = "~/SLE/Glycans/Markers_of_Interest_with_stats.xlsx")
 
 ```
@@ -264,5 +273,18 @@ Glycans_of_Int_annotated <- Glycan_Annotations_clean %>%
 
 # write_xlsx(x = Glycans_of_Int_annotated, path = "~/SLE/Glycans/Markers_of_Interest_annotated.xlsx")
 
+```
+
+
+```{r}
+
+df <- read_xlsx(path = "~/SLE/Glycans/Output_Data/Figure_6_Cox/Figure_6_Cox_Univariable.xlsx") %>%
+  separate(col = Marker, into = c("Origin", "Marker"), sep = "_") %>% 
+  filter(p.value < 0.05)
+
+df %>%
+  select(Origin, Marker, p.value, hazard_ratio, conf.low, conf.high) %>% 
+filter(Marker == "IORMIF1N5H6S2F1")
+  
 ```
 
