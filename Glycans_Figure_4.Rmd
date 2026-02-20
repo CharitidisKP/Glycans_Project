@@ -9,6 +9,7 @@ library(ggtext)
 library(ggplot2)
 library(broom.helpers)
 library(writexl)
+library(patchwork)
 
 ```
 
@@ -47,7 +48,6 @@ DFs_Delta_Combined <- cbind(Glycan_Deltas, Comparator_Values_Delta)
 
 ```
 
-
 ```{r Delta - Delta correlation}
 
 Correlations_Delta <- expand_grid(Marker = colnames(Glycan_Deltas), 
@@ -69,7 +69,7 @@ Correlations_Delta <- expand_grid(Marker = colnames(Glycan_Deltas),
 
 ```
 
-```{r Delta visualisations}
+```{r Delta visualisation prep and save the tables}
 
 Correlations_Delta_Sign <- Correlations_Delta %>%
   group_by(Marker) %>% 
@@ -83,59 +83,16 @@ max_len_Delta <- Correlations_Delta_Sign %>%
   max(na.rm = TRUE)
 
 Correlations_Delta_Sign_2 <- Correlations_Delta_Sign %>% 
-  mutate(Marker = str_pad(Marker, width = max_len_Delta, side = "left", pad = "\u00A0")) 
+  mutate(Marker_2 = str_pad(Marker, width = max_len_Delta, side = "left", pad = "\u00A0")) 
 
 # write_csv(Correlations_Delta, 
 #           file = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Glycan_Delta_Clinical_Delta_Correlations.csv")
 
 # write_xlsx(Correlations_Delta, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Indices_Correlation.xlsx")
 
-Correlations_Delta_Sign_plot <- ggplot(Correlations_Delta_Sign_2, aes(x = Comparator, y = Marker, fill = Correlation)) +
-  geom_tile(color = "white", width = 1, height = 1) +
-  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
-                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
-                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
-                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
-  facet_grid(Origin ~ ., scales = "free_y", space = "free_y", 
-             labeller = labeller(Origin = function(x) 
-               ifelse(x == "Serum", "Serum<br>proteome", x))) +
-  # geom_text(aes(label = round(Correlation, 2)), size = 3) +
-  geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
-  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
-  scale_x_discrete(labels = function(x) {
-    x <- gsub("_", " ", x)
-    x <- gsub("Extra Renal", "Extra<br>Renal", x)
-    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
-    x }, expand = c(0,0)) +
-  labs(title = "Correlations between glycans and clinical indices", x = NULL, y = NULL) +
-  theme_minimal(base_size = 12, base_family = "sans") +
-  theme(strip.placement = "outside",
-        strip.text.y.right = element_markdown(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
-        axis.text.x = element_markdown(angle = 0, hjust = 0.5, 
-                                       # face = "bold", 
-                                       colour = "black"), 
-        axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
-        panel.grid  = element_blank(), 
-        panel.spacing = unit(1, "lines"), 
-        plot.caption.position = "plot", 
-        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
-        plot.title = element_markdown(face = "bold"))
-
-n_markers <- Correlations_Delta_Sign %>% 
-    distinct(Marker) %>% 
-    nrow()
-
-plot_height <- max(n_markers * 0.3, 4)
-
-# ggsave(Correlations_Delta_Sign_plot,
-#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Delta_sign_only.jpeg",
-#        width = 10, height = plot_height, dpi = 300)
-
-# caption = paste0("Correlation coefficient used: <b>Spearman</b>")
-
 ```
 
-```{r Delta - Month 12 Correlation}
+```{r Delta - Month 12 Correlation and save}
 
 Delta_vs_M12 <- Comparator_Values %>% 
   filter(Time_point == "T12") %>% 
@@ -163,9 +120,12 @@ Glycan_Deltas_vs_M12_Cor <- expand_grid(Marker = colnames(Glycan_Deltas),
 # write_csv(Glycan_Deltas_vs_M12_Cor,
 #           file = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Glycan_Delta_Clinical_Month12_Correlations.csv")
 
+# write_xlsx(Glycan_Deltas_vs_M12_Cor, 
+#            path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Indices_T12_Correlation.xlsx")
+
 ```
 
-```{r Delta vs Month 12 visualisation}
+```{r Delta vs Month 12 visualisation prep}
 
 Glycan_Deltas_vs_M12_Cor_Sign <- Glycan_Deltas_vs_M12_Cor %>%
   group_by(Marker) %>% 
@@ -179,54 +139,8 @@ max_len_DM12 <- Glycan_Deltas_vs_M12_Cor_Sign %>%
   nchar() %>%
   max(na.rm = TRUE)
 
-Correlations_Delta_Sign_2 <- Correlations_Delta_Sign %>% 
-  mutate(Marker = str_pad(Marker, width = max_len_DM12, side = "left", pad = "\u00A0")) 
-
-# write_xlsx(Glycan_Deltas_vs_M12_Cor, 
-#            path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Indices_T12_Correlation.xlsx")
-
-Glycan_Deltas_vs_M12_Cor_Sign_plot <- ggplot(Correlations_Delta_Sign_2, aes(x = Comparator, y = Marker, fill = Correlation)) +
-  geom_tile(color = "white", width = 1, height = 1) +
-  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
-                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
-                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
-                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
-  facet_grid(Origin ~ ., scales = "free_y", space = "free_y", 
-             labeller = labeller(Origin = function(x) 
-               ifelse(x == "Serum", "Serum<br>proteome", x))) +
-  # geom_text(aes(label = round(Correlation, 2)), size = 3) +
-  geom_text(aes(label = Significance, vjust = 0.5, hjust = 0.5, fontface = "bold")) +
-  scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
-  scale_x_discrete(labels = function(x) {
-    x <- gsub("_", " ", x)
-    x <- gsub("Extra Renal", "Extra<br>Renal", x)
-    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
-    x }, expand = c(0,0)) +
-  labs(title = "Correlations between glycan deltas and month 12 marker values", x = NULL, y = NULL) +
-  theme_minimal(base_size = 12, base_family = "sans") +
-  theme(strip.placement = "outside",
-        strip.text.y.right = element_markdown(angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
-        axis.text.x = element_markdown(angle = 0, hjust = 0.5, 
-                                       # face = "bold",
-                                       colour = "black"), 
-        axis.text.y = element_text(size = 8, face = "bold", colour = "black"),
-        panel.grid  = element_blank(), 
-        panel.spacing = unit(1, "lines"), 
-        plot.caption.position = "plot", 
-        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
-        plot.title = element_markdown(face = "bold"))
-
-n_markers <- Glycan_Deltas_vs_M12_Cor_Sign %>% 
-    distinct(Marker) %>% 
-    nrow()
-
-plot_height <- max(n_markers * 0.3, 4)
-
-# ggsave(Glycan_Deltas_vs_M12_Cor_Sign_plot,
-#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Month_12_sign_only.jpeg",
-#        width = 10, height = plot_height, dpi = 300)
-
-# caption = paste0("Correlation coefficient used: <b>Spearman</b>")
+Glycan_Deltas_vs_M12_Cor_Sign_2 <- Glycan_Deltas_vs_M12_Cor_Sign %>% 
+  mutate(Marker_2 = str_pad(Marker, width = max_len_DM12, side = "left", pad = "\u00A0")) 
 
 ```
 
@@ -291,9 +205,12 @@ Delta_Hist_Cor_Res <- rbind(Delta_Hist_Cor_T0, Delta_Hist_Cor_T12) %>%
 # write_csv(Delta_Hist_Cor_Res,
 #           file = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Glycan_Delta_NIH_Correlations.csv")
 
+# write_xlsx(Delta_Hist_Cor_Res, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Hist_Correlation.xlsx")
+
+
 ```
 
-```{r}
+```{r Prep the NIH terms and the Delta vs Histological correlation tables}
 
 NIH_mapping <- c(Cellular_crescents = "Cellular/Fibrocellular_crescents",
                  Cellular_proliferation = "Endocapillary_hypercellularity",
@@ -303,74 +220,283 @@ NIH_mapping <- c(Cellular_crescents = "Cellular/Fibrocellular_crescents",
                  Mononuclear_cell_infiltration = "Interstitial_inflammation")
 
 Delta_Hist_Cor_Res_Sign <- Delta_Hist_Cor_Res %>% 
+  separate(col = Marker, into = c("Origin", "Marker"), sep = "_", extra = "merge", fill = "right") %>% 
   mutate(Category = gsub("_", " ", Category), 
          Histology = recode(Histology, !!!NIH_mapping), 
          Histology = sub("_", "<br>", Histology), 
-         Histology = gsub("/", " /<br>", Histology),
-         Origin = gsub("Serum", "Serum<br>proteome", Origin), 
+         Histology = gsub("/", "/<br>", Histology),
+         # Origin = gsub("Serum", "Serum<br>proteome", Origin),
          Origin = factor(Origin, levels = c("AGP", "C3", "Fab", "Fc", "IgG", "Serum")))
 
-# write_xlsx(Delta_Hist_Cor_Res, path = "~/SLE/Glycans/Data/Results/Delta_Correlations/Marker_Delta_Hist_Correlation.xlsx")
+max_len_Delta_NIH <- Delta_Hist_Cor_Res_Sign %>%
+  pull(Marker) %>%
+  nchar() %>%
+  max(na.rm = TRUE)
 
-Plot_delta_hist_cor <- function(Dataframe_clean, Time, Title) {
+Delta_Hist_Cor_Res_Sign_2 <- Delta_Hist_Cor_Res_Sign %>% 
+  mutate(Marker_2 = str_pad(Marker, width = max_len_Delta_NIH, side = "left", pad = "\u00A0")) 
+
+
+```
+
+```{r Set the correlation sales}
+
+Corr_scale <- bind_rows(Correlations_Delta_Sign_2, Glycan_Deltas_vs_M12_Cor_Sign_2, Delta_Hist_Cor_Res_Sign_2) %>%
+  summarise(min_corr = min(Correlation, na.rm = TRUE),
+            max_corr = max(Correlation, na.rm = TRUE))
+
+```
+
+```{r}
+
+Glycan_Annotations_clean <- read_xlsx("~/SLE/Glycans/Output_Data/Gl_annotations_clean.xlsx") %>% 
+  mutate(Glycan_Annotation = gsub(" - Multiple Structures", "", Glycan_Annotation)) %>% 
+  select(Origin, Marker, Glycan_Annotation)
+
+# 1) Wrap your pipeline into a function
+process_DF <- function(df) {
+  df2 <- df %>%
+    inner_join(Glycan_Annotations_clean, by = c("Origin", "Marker"))
+  
+  max_len <- df2 %>%
+    pull(Glycan_Annotation) %>%
+    nchar() %>%
+    max(na.rm = TRUE)
+  
+  df2 <- df2 %>% 
+    mutate(Marker = str_pad(Marker, width = max_len, side = "left", pad = "\u00A0"),
+           Glycan_Annotation = str_pad(Glycan_Annotation, width = max_len, side = "left", pad = "\u00A0"))
+  
+  DF <- df2 %>%
+    mutate(RowKey = interaction(Marker, Glycan_Annotation, sep = " | ", drop = TRUE, lex.order = TRUE)) %>%
+    ungroup()
+  
+  row_levels <- DF %>%
+    arrange(Origin, across(any_of(c("Comparator", "Histology"))), Marker) %>%
+    pull(RowKey) %>%
+    unique()
+  
+  lab_map <- DF %>%
+    distinct(RowKey, Glycan_Annotation) %>%
+    tibble::deframe()
+  
+  DF <- DF %>%
+    mutate(RowKey = factor(RowKey, levels = row_levels), 
+           Marker = str_pad(Marker, width = max_len, side = "left", pad = "\u00A0"),
+           Glycan_Annotation = str_pad(Glycan_Annotation, width = max_len, side = "left", pad = "\u00A0"),
+           RowKey = str_pad(as.character(RowKey), width = max_len, side = "left", pad = "\u00A0"))
+  
+  return(list(DF = DF, lab_map = lab_map))
+}
+
+Correlations_Delta_Sign_2_processed <- process_DF(Correlations_Delta_Sign_2)
+Glycan_Deltas_vs_M12_Cor_Sign_2_processed <- process_DF(Glycan_Deltas_vs_M12_Cor_Sign_2)
+Delta_Hist_Cor_Res_Sign_2_processed <- process_DF(Delta_Hist_Cor_Res_Sign_2)
+
+```
+
+
+
+```{r Marker Clinical features Deltas Correlations visualisation}
+
+Correlations_Delta_Sign_plot <- ggplot(Correlations_Delta_Sign_2_processed$DF, 
+                                       aes(x = Comparator, y = RowKey, fill = Correlation)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                       limits = c(Corr_scale$min_corr, Corr_scale$max_corr),
+                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+  facet_grid(Origin ~ ., scales = "free_y", space = "free_y", 
+             labeller = labeller(Origin = function(x) 
+               ifelse(x == "Serum", "Serum<br>N-glycome", x))) +
+  geom_text(aes(label = Significance), vjust = 0.8, hjust = 0.5, fontface = "bold", size = 7) +
+  # scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+  scale_y_discrete(labels = Correlations_Delta_Sign_2_processed$lab_map, expand = c(0,0)) +
+  scale_x_discrete(labels = function(x) gsub("_", " ", x), expand = c(0,0)) +
+  labs(title = "Correlations between changes in glycan markers and changes in clinical features", 
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 11, base_family = "sans") +
+  theme(strip.placement = "outside",
+        strip.text.y.right = element_markdown(size = 11, angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        axis.text.x = element_markdown(size = 11, angle = 0, hjust = 0.5, 
+                                       # face = "bold", 
+                                       colour = "black"), 
+        axis.text.y = element_markdown(size = 11, face = "bold", colour = "black"),
+        panel.grid  = element_blank(), 
+        panel.spacing = unit(1, "lines"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+        plot.title = element_markdown(face = "bold"))
+
+```
+
+
+```{r Marker Deltas Clinical features month 12 Correlations visualisation}
+
+Glycan_Deltas_vs_M12_Cor_Sign_plot <- ggplot(Glycan_Deltas_vs_M12_Cor_Sign_2_processed$DF, 
+                                             aes(x = Comparator, y = RowKey, fill = Correlation)) +
+  geom_tile(color = "white", width = 1, height = 1) +
+  scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                       limits = c(Corr_scale$min_corr, Corr_scale$max_corr),
+                       midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
+                       guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
+                                              title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
+  facet_grid(Origin ~ ., scales = "free_y", space = "free_y", 
+             labeller = labeller(Origin = function(x) 
+               ifelse(x == "Serum", "Serum<br>N-glycome", x))) +
+  geom_text(aes(label = Significance), vjust = 0.7, hjust = 0.5, fontface = "bold", size = 7) +
+  # scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
+  scale_y_discrete(labels = Glycan_Deltas_vs_M12_Cor_Sign_2_processed$lab_map, expand = c(0,0)) +
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("_", " ", x)
+    x <- gsub("Extra Renal", "Extra<br>Renal", x)
+    x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
+    x }, expand = c(0,0)) +
+  labs(title = "Correlations between changes in glycan markers and clinical features: Month 12",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 11, base_family = "sans") +
+  theme(strip.placement = "outside",
+        strip.text.y.right = element_markdown(size = 11, angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        axis.text.x = element_markdown(size = 11, angle = 0, hjust = 0.5, 
+                                       # face = "bold",
+                                       colour = "black"), 
+        axis.text.y = element_markdown(size = 11, face = "bold", colour = "black"),
+        panel.grid  = element_blank(), 
+        panel.spacing = unit(1, "lines"), 
+        plot.caption.position = "plot", 
+        plot.caption = element_markdown(hjust = 0.9, vjust = 1),
+        plot.title = element_markdown(face = "bold"))
+
+```
+
+```{r Fix each plot again - Marker deltas vs Histologies}
+
+Plot_delta_hist_cor <- function(Dataframe_clean, lab_map, Time, Title) {
   
   Dataframe_clean <- Dataframe_clean %>% 
-    group_by(Marker) %>% 
     filter(Time_label == Time) %>% 
+    group_by(Origin, Marker) %>% 
     filter(any(Significance == "*")) %>% 
-    separate(col = Marker, into = c("Origin", "Marker"), sep = "_", extra = "merge", fill = "right")
+    ungroup()
 
   max_len_current <- Dataframe_clean %>%
     pull(Marker) %>%
     nchar() %>%
     max(na.rm = TRUE)
 
-  Dataframe_clean_2 <- Dataframe_clean %>% 
-    mutate(Marker = str_pad(Marker, width = max_len_DM12, side = "left", pad = "\u00A0"), 
-           Origin = gsub("Serum", "Serum<br>proteome", Origin)) 
+  Dataframe_clean_2 <- Dataframe_clean %>%
+    mutate(Marker_2 = str_pad(Marker, width = max_len_current, side = "left", pad = "\u00A0"),
+           Origin = gsub("Serum", "Serum<br>N-glycome", Origin))
   
-  this_plot <- ggplot(Dataframe_clean_2, aes(x = Histology, y = Marker, fill = Correlation)) +
+  this_plot <- ggplot(Dataframe_clean_2, aes(x = Histology, y = RowKey, fill = Correlation)) +
     geom_tile(color = "white", width = 1, height = 1) +
     scale_fill_gradient2(low = "dodgerblue", mid = "white", high = "firebrick", 
+                         limits = c(Corr_scale$min_corr, Corr_scale$max_corr),
                          midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
                          guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
                                                 title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
     facet_grid(Origin ~ Category, scales = "free", space = "free") +
-    scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
-    scale_y_discrete(expand = c(0, 0)) +
-    geom_text(aes(label = Significance, vjust = 0.7, hjust = 0.5, fontface = "bold")) +
-    labs(title = paste0("Correlation heatmap of marker deltas vs clinical/histopathological features ", Title , " values"), x = NULL, y = NULL) +
-    theme_minimal(base_size = 12, base_family = "sans") +
+    scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) gsub("<br>", "\n", x, fixed = TRUE)) +
+    scale_y_discrete(labels = lab_map, expand = expansion(add = 0.8)) +
+    # scale_y_discrete(expand = expansion(add = 0.8)) +
+    geom_text(aes(label = Significance), vjust = 0.7, hjust = 0.5, fontface = "bold", size = 7) +
+    labs(title = paste0("Correlations between changes in glycan markers and clinical/histopathological features: ", 
+                        Title), 
+         x = NULL, y = NULL) +
+    theme_minimal(base_size = 11, base_family = "sans") +
     theme(strip.placement = "outside",
-          strip.text.y.right = element_markdown(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
-          strip.text.x.top = element_markdown(angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
-          axis.text.x = element_markdown(size = 9, angle = 60, hjust = 1, vjust = 1, 
+          strip.text.y.right = element_markdown(size = 11, 
+                                                angle = 0, 
+                                                hjust = 0.5, 
+                                                vjust = 0.5, 
+                                                face = "bold", 
+                                                margin = margin(t = 3,
+                                                                r = 3, 
+                                                                b = 3, 
+                                                                l = 3)),
+          strip.text.x.top = element_markdown(size = 11, angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
+          axis.text.x = element_markdown(size = 11, angle = 60, hjust = 1, vjust = 1, 
                                          # face = "bold", 
                                          colour = "black"), 
-          axis.text.y = element_markdown(size = 8, face = "bold", colour = "black"),
+          axis.text.y = element_markdown(size = 11, face = "bold", colour = "black"),
           panel.grid  = element_blank(), 
           panel.spacing = unit(1, "lines"), 
           plot.caption.position = "plot", 
           plot.caption = element_markdown(hjust = 0.9, vjust = 1),
           plot.title = element_markdown(face = "bold", lineheight = 1.2))
 
-  n_markers <- Dataframe_clean %>% 
-    distinct(Marker) %>% 
-    nrow()
-
-  plot_height <- max(n_markers * 0.4, 8)
-  
-  # Title <- gsub(" ", "_", Title)
-  # 
-  # ggsave(plot = this_plot, 
-  #      filename = paste0("~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_vs_Hist_", Title, ".jpeg"), 
-  #      width = 15, height = plot_height, dpi = 300, device = "jpeg")
-  
   this_plot
 }
 
-Delta_Hist_T0_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign, 0, "baseline")
-Delta_Hist_T12_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign, 12, "month 12")
+Delta_Hist_T0_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign_2_processed$DF, 
+                                              Delta_Hist_Cor_Res_Sign_2_processed$lab_map, 0, "Baseline")
+Delta_Hist_T12_cor_plot <- Plot_delta_hist_cor(Delta_Hist_Cor_Res_Sign_2_processed$DF, 
+                                               Delta_Hist_Cor_Res_Sign_2_processed$lab_map, 12, "Month 12")
+
+Delta_Hist_T0_cor_plot
+Delta_Hist_T12_cor_plot
+
+```
+
+```{r Combined F4 A4}
+
+p1 <- Correlations_Delta_Sign_plot + labs(tag = "A") + theme(title = element_text(size = 14))
+p2 <- Glycan_Deltas_vs_M12_Cor_Sign_plot + labs(tag = "B") + theme(title = element_text(size = 14))
+# p3 <- Delta_Hist_T0_cor_plot + labs(tag = "C")
+p4 <- Delta_Hist_T12_cor_plot + labs(tag = "C") + theme(title = element_text(size = 14))
+
+Gabagool <- wrap_plots(p1, 
+                       p2, 
+                       p4,
+                       ncol = 1, 
+                       # heights = c(0.33, ),
+                       guides = "collect") &
+  # plot_annotation(title = "Correlation heatmap<br>
+  #                 Comparisons between glycan deltas, clinical indices and clinical/histopathological values", 
+  #                 theme = theme(plot.title = element_markdown(face = "bold", size = 23, hjust = 0),
+  #                               plot.tag = element_markdown(face = "bold", size = 16))) &
+  theme(
+    legend.position = "right",
+    legend.title = element_markdown(face = "bold"),
+    legend.key.width = unit(2, "lines"),
+    legend.key.height = unit(4, "lines"),    
+    legend.spacing.y = unit(0.5, "lines"))
+
+Gabagool <- Gabagool & theme(plot.tag = element_markdown(color = "black", face = "bold", size = 30), 
+                             axis.text = element_markdown(size = 11), 
+                             axis.text.y = element_markdown(margin = margin(5)),
+                             strip.text.y.right = element_markdown(hjust = 0, vjust = 0.5))
+
+# ggsave(plot = Gabagool,
+#        filename = "~/SLE/Glycans/Plots_2/Figure_4_Delta_Correlations/Delta_Corr_Combined_Glycans_A4.jpeg",
+#        width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
+
+ggsave(plot = Gabagool,
+       filename = "~/SLE/Glycans/Plots_2/Final_Figures/Figure_4.jpeg",
+       width = 210, height = 297, units = "mm", scale = 2, dpi = 600, device = "jpeg")
+
+```
+
+```{r Save the excels}
+
+# Correlations_Delta_Sign_2, Glycan_Deltas_vs_M12_Cor_Sign_2, Delta_Hist_Cor_Res_Sign_2
+
+# write_xlsx(x = Correlations_Delta_Sign_2,
+#            path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_Clinical_Delta_Correlations.xlsx")
+# 
+# write_xlsx(x = Glycan_Deltas_vs_M12_Cor_Sign_2,
+#            path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_Clinical_M12_Correlations.xlsx")
+# 
+# Delta_Hist_Cor_Res_Sign_2 %>% 
+#   filter(Time_label == "0") %>% 
+#   write_xlsx(x = .,
+#            path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_NIH_Baseline_Correlations.xlsx")
+# 
+# Delta_Hist_Cor_Res_Sign_2 %>% 
+#   filter(Time_label == "12") %>% 
+#   write_xlsx(x = .,
+#            path = "~/SLE/Glycans/Output_Data/Figure_4_Delta_Cors/Figure_4_Glycan_Delta_NIH_Month12_Correlations.xlsx")
 
 ```
 

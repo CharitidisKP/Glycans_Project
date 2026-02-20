@@ -98,17 +98,45 @@ Reg_Results_Basic_stats <- Reg_Results_Basic %>%
 
 ```{r Firths penalised regression}
 
+## Old CIs (Wald's) ##
+# Tidy_Firth <- function(fit, term) {
+#   est <- coef(fit)[term]
+#   se <- sqrt(diag(vcov(fit)))[term]
+#   stat <- est/se
+#   pval <- fit$prob[term]
+#   
+#   tibble(term = term, 
+#           estimate = est, 
+#           std.error = se,
+#           statistic = stat, 
+#           p.value = pval)
+# }
+
+## New CIs (profile penalised-likelihood CIs) ##
 Tidy_Firth <- function(fit, term) {
   est <- coef(fit)[term]
-  se <- sqrt(diag(vcov(fit)))[term]
-  stat <- est/se
+  se  <- sqrt(diag(vcov(fit)))[term]
+  stat <- est / se
   pval <- fit$prob[term]
-  
-  tibble(term = term, 
-          estimate = est, 
-          std.error = se,
-          statistic = stat, 
-          p.value = pval)
+
+  ci <- tryCatch({
+    as.numeric(confint(fit, parm = term))   # profile penalised-likelihood CI (preferred)
+  }, error = function(e) c(NA_real_, NA_real_))
+
+  tibble(
+    term = term,
+    estimate = est,
+    std.error = se,
+    statistic = stat,
+    p.value = pval,
+    CI_lower = ci[1],
+    CI_upper = ci[2],
+    OR = exp(est),
+    OR_CI_lower = exp(ci[1]),
+    OR_CI_upper = exp(ci[2]), 
+    log10OR = log10(OR), 
+    Significance = if_else(p.value < 0.05, "Significant", "Not Significant")
+  )
 }
 
 F_control <- logistf.control(maxit = 500, maxstep = 10)
@@ -140,173 +168,44 @@ Reg_Results_Firth <- Models_DF %>%
   group_by(Model) %>% 
   mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
   ungroup() %>% 
-  select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
+  select(Marker, Outcome, Model, OR, OR_CI_lower, OR_CI_upper, p.value, FDR, everything())
 
-# Reg_Results_Firth_stats %>% 
-#   filter(p.value < 0.05)
+# Reg_Results_Firth_stats <- Reg_Results_Firth %>% 
+#   mutate(OR = exp(estimate), 
+#          log10OR = log10(OR), 
+#          CI_lower = estimate - 1.96 * std.error,
+#          CI_upper = estimate + 1.96 * std.error, 
+#          Significance = if_else(p.value < 0.05, "Significant", "Not Significant"))
 
-Reg_Results_Firth_stats <- Reg_Results_Firth %>% 
-  mutate(OR = exp(estimate), 
-         log10OR = log10(OR), 
-         CI_lower = estimate - 1.96 * std.error,
-         CI_upper = estimate + 1.96 * std.error, 
-         Significance = if_else(p.value < 0.05, "Significant", "Not Significant"))
+Reg_Results_Firth_stats <- Reg_Results_Firth
 
-# write_csv(Reg_Results_Firth, file = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/GLM_Firth.csv")
-
-## Save separately as excel files ##
+# write_csv(Reg_Results_Firth, file = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/GLM_Firth_NEW_CIs.csv")
+# 
+# ## Save separately as excel files ##
 # Reg_Results_Firth_stats %>%
 #   filter(Model == "T0") %>%
 #   write_xlsx(x = .,
-#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Baseline.xlsx")
+#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Baseline_NEW_CIs..xlsx")
 # 
 # Reg_Results_Firth_stats %>%
 #   filter(Model == "T12") %>%
 #   write_xlsx(x = .,
-#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Month12.xlsx")
+#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Month12_NEW_CIs..xlsx")
 # 
 # Reg_Results_Firth_stats %>%
 #   filter(Model == "Delta") %>%
 #   write_xlsx(x = .,
-#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Delta.xlsx")
+#            path = "~/SLE/Glycans/Output_Data/Figure_5_GLMs/Figure_5_GLM_Firth_Delta_NEW_CIs..xlsx")
 
 ```
 
-```{r Lasso and Ridge regression}
-
-## Function to retrieve the values from the LR penalised regressions ##
-# Tidy_LR <- function(cvfit, term) {
-#   if (is.null(cvfit)) {
-#     return(tibble(term = term,
-#                   estimate = NA_real_,
-#                   std.error = NA_real_,
-#                   statistic = NA_real_,
-#                   p.value = NA_real_))
-#   }
-#   
-#   coef_mat <- as.matrix(coef(cvfit, s = "lambda.min"))
-#   est <- coef_mat[term, ]
-#   tibble(term = term,
-#          estimate = as.numeric(est),
-#          std.error = NA_real_,
-#          statistic = NA_real_,
-#          p.value = NA_real_)
-# }
-# 
-# ## Lasso regression ##
-# Reg_Results_Lasso <- Models_DF %>% 
-#   group_by(Marker, Outcome) %>% 
-#   nest() %>%
-#   mutate(
-#     fit_T0_Lasso = map(data, ~ {
-#       mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
-#       y <- model.response(mf)
-#       tab <- table(y)
-#       if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
-#       x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
-#       cv.glmnet(x, y, family = "binomial", alpha = 1)}),
-#     
-#     fit_T12_Lasso = map(data, ~ {
-#       mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
-#       y <- model.response(mf)
-#       tab <- table(y)
-#       if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
-#       x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
-#       cv.glmnet(x, y, family = "binomial", alpha = 1)}),
-#     
-#     fit_Delta_Lasso = map(data, ~ {
-#       mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
-#       y <- model.response(mf)
-#       tab <- table(y)
-#       if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
-#       x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
-#       cv.glmnet(x, y, family = "binomial", alpha = 1)}),
-#         
-#     fit_Log2FC_Lasso = map(data, ~ {
-#       mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
-#       y <- model.response(mf)
-#       tab <- table(y)
-#       if (length(tab) < 2 || any(tab < 2L)) { return(NULL) }
-#       x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
-#       cv.glmnet(x, y, family = "binomial", alpha = 1)}),                        
-#     
-#     Tidy_T0_Lasso = map(fit_T0_Lasso, ~ Tidy_LR(.x, "T0")), 
-#     Tidy_T12_Lasso = map(fit_T12_Lasso, ~ Tidy_LR(.x, "T12")), 
-#     Tidy_Delta_Lasso = map(fit_Delta_Lasso, ~ Tidy_LR(.x, "Delta")),
-#     Tidy_Log2FC_Lasso = map(fit_Log2FC_Lasso, ~ Tidy_LR(.x, "Log2FC"))) %>% 
-#   
-#   select(Marker, Outcome, starts_with("Tidy_")) %>%
-#   pivot_longer(cols = starts_with("Tidy_"), 
-#                names_to = "Model", 
-#                values_to = "Tidy", 
-#                names_prefix = "Tidy_") %>% 
-#   unnest(Tidy) %>% 
-#   group_by(Model) %>% 
-#   mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
-#   ungroup() %>% 
-#   select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
-# 
-# 
-# ## Ridge regression ##
-# Reg_Results_Ridge <- Models_DF %>% 
-#   group_by(Marker, Outcome) %>% 
-#   nest() %>%
-#   mutate(
-#     fit_T0_Ridge = map(data, ~ {
-#       mf <- model.frame(Value_Hist ~ T0, data = .x, na.action = na.omit)
-#       y <- model.response(mf)
-#       if (length(unique(y)) < 2) return(NULL)
-#       x <- model.matrix(Value_Hist ~ T0, data = .x[, -1, drop = FALSE])
-#       cv.glmnet(x, y, family = "binomial", alpha = 0)}),
-#     
-#     fit_T12_Ridge = map(data, ~ {
-#       mf <- model.frame(Value_Hist ~ T12, data = .x, na.action = na.omit)
-#       y <- model.response(mf)
-#       if (length(unique(y)) < 2) return(NULL)
-#       x <- model.matrix(Value_Hist ~ T12, data = .x[, -1, drop = FALSE])
-#       cv.glmnet(x, y, family = "binomial", alpha = 0)}),
-#     
-#     fit_Delta_Ridge = map(data, ~ {
-#       mf <- model.frame(Value_Hist ~ Delta, data = .x, na.action = na.omit)
-#       y <- model.response(mf)
-#       if (length(unique(y)) < 2) return(NULL)
-#       x <- model.matrix(Value_Hist ~ Delta, data = .x[, -1, drop = FALSE])
-#       cv.glmnet(x, y, family = "binomial", alpha = 0)}),
-#         
-#     fit_Log2FC_Ridge = map(data, ~ {
-#       mf <- model.frame(Value_Hist ~ Log2FC, data = .x, na.action = na.omit)
-#       y <- model.response(mf)
-#       if (length(unique(y)) < 2) return(NULL)
-#       x <- model.matrix(Value_Hist ~ Log2FC, data = .x[, -1, drop = FALSE])
-#       cv.glmnet(x, y, family = "binomial", alpha = 0)}),                         
-#     
-#     Tidy_T0_Ridge = map(fit_T0_Ridge, ~ Tidy_LR(.x, "T0")), 
-#     Tidy_T12_Ridge = map(fit_T12_Ridge, ~ Tidy_LR(.x, "T12")), 
-#     Tidy_Delta_Ridge = map(fit_Delta_Ridge, ~ Tidy_LR(.x, "Delta")),
-#     Tidy_Log2FC_Ridge = map(fit_Log2FC_Ridge, ~ Tidy_LR(.x, "Log2FC"))) %>% 
-#   
-#   select(Marker, Outcome, starts_with("Tidy_")) %>%
-#   pivot_longer(cols = starts_with("Tidy_"), 
-#                names_to = "Model", 
-#                values_to = "Tidy", 
-#                names_prefix = "Tidy_") %>% 
-#   unnest(Tidy) %>% 
-#   group_by(Model) %>% 
-#   mutate(FDR = p.adjust(p.value, method = "fdr")) %>% 
-#   ungroup() %>% 
-#   select(Marker, Outcome, Model, estimate, std.error, statistic, p.value, FDR)
-
-
-```
-
-```{r Model visualisation}
+```{r Model visualisation (Not for the publication)}
 
 plot_GLM_results <- function(Dataframe_GLM, Model_Type) {
   
   DF_Plot_clean <- Dataframe_GLM %>% 
-    filter(Model != "T0") %>% 
-    mutate(Model = sub("Log2FC", "Log<sub>2</sub>FC", Model), 
-           Label = gsub("_", " ", Marker), 
+    filter(Model != "Log2FC") %>% 
+    mutate(Label = gsub("_", " ", Marker), 
            log_p = -log10(p.value))  
     
   top_10_markers <- DF_Plot_clean %>% 
@@ -367,197 +266,13 @@ Normal_GLM_Plot <- plot_GLM_results(Reg_Results_Basic_stats, "non penalised")
 
 ```
 
-```{r}
+```{r Glycan annotation prep and cleanup}
 
-Sign_Markers <- Reg_Results_Firth_stats %>% 
-  filter(Model != "T0") %>% 
-  filter(p.value < 0.05) %>% 
-  group_by(Marker) %>%
-  summarize(
-    clinical_sig   = any(Outcome == "Clinical"),
-    histo_sig      = any(Outcome == "Histological"),
-    .groups = "drop"
-  ) %>%
-  
-  # 3) keep only those with both TRUE
-  filter(clinical_sig & histo_sig) %>% 
-  select(Marker) %>% pull()
-
-Double_Sign_Markers <- Reg_Results_Firth_stats %>%
-  filter(Model != "T0",
-         Marker %in% Sign_Markers) %>%
-  pull(Marker)
-
-```
-
-```{r}
-
-plot_GLM_results <- function(Dataframe_GLM, Method, Model_Type, Double_Sign_Markers) {
-  
-  DF_Plot <- Dataframe_GLM %>% 
-    filter(Model == Method) %>% 
-    mutate(Title = case_when(Model == "T0" ~ "baseline", 
-                             Model == "Delta" ~ "delta", 
-                             Model == "T12" ~ "month 12", 
-                             Model == "Log2FC" ~ "log<sub>2</sub>FC", 
-                             TRUE ~ "Yeet"))
-
-  Current_Title <- DF_Plot %>% 
-    select(Title) %>% 
-    distinct() %>% 
-    pull()
-  
-  Sign_Markers_current <- DF_Plot %>% 
-    filter(p.value < 0.05) %>% 
-    group_by(Marker) %>%
-    summarize(clinical_sig = any(Outcome == "Clinical"),
-              histo_sig = any(Outcome == "Histological"),
-              .groups = "drop") %>%
-    filter(clinical_sig & histo_sig) %>% 
-    select(Marker) %>% pull()
-  
-    DF_Plot_clean <- DF_Plot %>% 
-    mutate(Model = sub("Log2FC", "Log<sub>2</sub>FC", Model)) %>% 
-    mutate(Highlight = case_when(Marker %in% Sign_Markers_current ~ "Significant in both<br>response types models", 
-                                 Significance == "Significant" ~ "Significant in one model",
-                                 TRUE ~ "Not significant"), 
-           Label = gsub("_", " ", Marker))
-
-  Double_sign_Plot <- ggplot(DF_Plot_clean, aes(x = log10(OR), y = -log10(p.value))) +
-    geom_point(aes(color = Highlight, alpha = Significance), size = 2) +
-    geom_text_repel(data = DF_Plot_clean %>% filter(Marker %in% Sign_Markers_current), 
-                    aes(label = Label), 
-                    color = "black", 
-                    size = 3, 
-                    force = 2,
-                    box.padding = 0.3, 
-                    point.padding = 0.1, 
-                    segment.color = NA, 
-                    max.overlaps = Inf, 
-                    min.segment.length = 0) +
-    scale_colour_manual(values = c("Significant in both<br>response types models" = "deeppink3", 
-                                   "Significant in one model" = "royalblue", 
-                                   "Not significant" = "grey")) +
-    scale_alpha_manual(values = c("Significant" = 1.0, 
-                                  "Not Significant" = 0.2), 
-                                  guide = "none") +
-    scale_x_continuous(limits = c(-10, 10),
-                       breaks = seq(-10, 10, by = 5),
-                       expand = expansion(mult = c(0.05, 0.05))) +
-  labs(title = paste0("Logistic regression results - ", Model_Type," model
-                      <br>Marker data vs histological and clinical responses using ", Current_Title," comparisons"), 
-           x = "Odds Ratio (Log<sub>10</sub>)", 
-           y = "P value (-Log<sub>10</sub>)") + 
-    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
-    geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
-    facet_wrap(~ Outcome, ncol = 2, scales = "free_x") +
-    theme_minimal(base_size = 14) +
-    theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
-          # legend.title = element_markdown(face = "bold"), 
-          legend.title = element_blank(), 
-          legend.text = element_markdown(face = "bold"), 
-          axis.title.x = element_markdown(face = "bold"), 
-          axis.title.y = element_markdown(face = "bold"), 
-          strip.text.x.top = element_markdown(hjust = 0.5, vjust = 0.5, face  = "bold"),
-          plot.caption.position = "plot", 
-          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
-          panel.grid.major = element_line(color = "grey90"),
-          panel.grid.minor = element_blank()) 
-          
-}
-
-Firth_Double_sign_log2 <- plot_GLM_results(Reg_Results_Firth_stats, "Log2FC", "Firth's penalised", Double_Sign_Markers)
-Firth_Double_sign_delta <- plot_GLM_results(Reg_Results_Firth_stats, "Delta", "Firth's penalised", Double_Sign_Markers)
-Firth_Double_sign_M12 <- plot_GLM_results(Reg_Results_Firth_stats, "T12", "Firth's penalised", Double_Sign_Markers)
-Firth_Double_sign_T0 <- plot_GLM_results(Reg_Results_Firth_stats, "T0", "Firth's penalised", Double_Sign_Markers)
-
-
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_Double_sign_log2.jpeg"),
-#        plot = Firth_Double_sign_log2, width = 12, height = 8, dpi = 300, device = "jpeg")
-# 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_Double_sign_delta.jpeg"),
-#        plot = Firth_Double_sign_delta, width = 12, height = 8, dpi = 300, device = "jpeg")
-# 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_Double_sign_M12.jpeg"),
-#        plot = Firth_Double_sign_M12, width = 12, height = 8, dpi = 300, device = "jpeg")
-
-```
-
-```{r Volcano plot with T0 instead of log2FC}
-
-plot_GLM_results2 <- function(Dataframe_GLM, Model_Type) {
-  
-  DF_Plot_clean <- Dataframe_GLM %>% 
-    filter(Model != "Log2FC") %>% 
-    mutate(Label = gsub("_", " ", Marker), 
-           log_p = -log10(p.value), 
-           Model = factor(Model, levels = c("T0", "T12", "Delta")))  
-    
-  top_10_markers <- DF_Plot_clean %>% 
-    group_by(Model) %>% 
-    slice_min(order_by = p.value, n = 10, with_ties = FALSE) %>% 
-    ungroup()
-    
-    ggplot(DF_Plot_clean, aes(x = log10OR, y = -log10(p.value))) +
-    geom_point(aes(color = Outcome, alpha = Significance), size = 2) +
-    geom_text_repel(data = top_10_markers, 
-                    inherit.aes = FALSE, 
-                    aes(x = log10OR, y = log_p, label = Label),
-                    color = "black", 
-                    size = 4, 
-                    force = 2,
-                    box.padding = 0.3, 
-                    point.padding = 0.1, 
-                    segment.color = NA, 
-                    max.overlaps = Inf, 
-                    min.segment.length = 0) +  
-    scale_colour_manual(breaks = c("Clinical", "Histological"), 
-                        values = c("midnightblue", "coral1"), 
-                        name = "Response") +
-    scale_alpha_manual(values = c("Significant" = 1.0, 
-                                  "Not Significant" = 0.2), 
-                                  guide = "none") +
-    scale_x_continuous(limits = c(-10, 10),
-                       breaks = seq(-10, 10, by = 5),
-                       expand = expansion(mult = c(0.05, 0.05))) +
-    labs(title = paste0("Logistic regression results - ", Model_Type," model
-                        <br>Marker data vs histological and clinical responses"), 
-           x = "Odds Ratio (Log<sub>10</sub>)", 
-           y = "P value (-Log<sub>10</sub>)") + 
-    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
-    geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
-    facet_wrap(~ Model, ncol = 1, nrow = 3, scales = "free_x") +
-    theme_minimal(base_size = 14) +
-    theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
-          legend.title = element_markdown(face = "bold"), 
-          legend.text = element_markdown(face = "bold", size = 11), 
-          axis.title.x = element_markdown(face = "bold"), 
-          axis.title.y = element_markdown(face = "bold"), 
-          strip.text.x.top = element_markdown(hjust = 0.5, vjust = 0.5, face  = "bold"),
-          plot.caption.position = "plot", 
-          plot.caption = element_markdown(hjust = 0.9, vjust = 1),
-          panel.grid.major = element_line(color = "grey90"),
-          panel.grid.minor = element_blank())
-}
-
-Firth_GLM_Plot2 <- plot_GLM_results2(Reg_Results_Firth_stats, "Firth's penalised")
-
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline_A4.jpeg"),
-#        plot = Firth_GLM_Plot2, width = 210, height = 297, units = "mm", scale = 2, dpi = 300, device = "jpeg")
-# 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_5_GLMs/Volcano_Firth_GLM_with_Baseline.jpeg"),
-#        plot = Firth_GLM_Plot2, width = 330, height = 200, units = "mm", scale = 2, dpi = 300, device = "jpeg")
-
-```
-
-
-```{r}
 Glycan_Annotations_clean <- read_xlsx("~/SLE/Glycans/Output_Data/Gl_annotations_clean.xlsx") %>% 
   mutate(Glycan_Annotation = gsub(" - Multiple Structures", "", Glycan_Annotation)) %>% 
   select(Origin, Marker, Glycan_Annotation) %>% 
   unite(Marker, c(Origin, Marker), sep = "_", remove = TRUE)
 
-# 1) Wrap your pipeline into a function
 process_DF <- function(df) {
   df2 <- df %>%
     inner_join(Glycan_Annotations_clean, by = "Marker")
@@ -595,17 +310,11 @@ process_DF <- function(df) {
 
 ```
 
-
-
-
-
-
-
-```{r}
+```{r Plotting function for the publication figures}
 
 plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
 
-  lgnd_cols <- c("Significant in both<br>response types" = "deeppink3",
+  lgnd_cols <- c("Significant in<br>histological and<br>clinical response" = "deeppink3",
                  "Significant in<br>clinical response" = "royalblue", 
                  "Significant in<br>histological response" = "mediumspringgreen",
                  "Not significant" = "grey80")
@@ -625,19 +334,19 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
     
   DF_Plot <- Dataframe_GLM %>% 
     filter(Model == Method) %>%
-    mutate(Title = case_when(Model == "T0" ~ "baseline", 
-                             Model == "Delta" ~ "delta", 
-                             Model == "T12" ~ "month 12", 
+    mutate(Title = case_when(Model == "T0" ~ "Baseline", 
+                             Model == "Delta" ~ "Delta", 
+                             Model == "T12" ~ "Month 12", 
                              Model == "Log2FC" ~ "log<sub>2</sub>FC", 
                              TRUE ~ "Yeet")) %>% 
     left_join(DF_Summary, by = "Marker") %>%
     mutate(Model = sub("Log2FC", "Log<sub>2</sub>FC", Model), 
-             Highlight = case_when(clinical_sig & histo_sig  ~ "Significant in both<br>response types",
+             Highlight = case_when(clinical_sig & histo_sig  ~ "Significant in<br>histological and<br>clinical response",
                                    clinical_sig & !histo_sig ~ "Significant in<br>clinical response", 
                                    !clinical_sig & histo_sig ~ "Significant in<br>histological response",
                                    TRUE ~ "Not significant"), 
              # Label = gsub("_", " ", Marker), 
-             Highlight = factor(Highlight, levels = c("Significant in both<br>response types", 
+             Highlight = factor(Highlight, levels = c("Significant in<br>histological and<br>clinical response", 
                                                       "Significant in<br>clinical response",
                                                       "Significant in<br>histological response",
                                                       "Not significant")))
@@ -667,7 +376,7 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
                Annotation = paste0(Origin, " ", str_trim(Glycan_Annotation)))
   } else {
     DF_Plot %>%
-      filter(Highlight == "Significant in both<br>response types")%>% 
+      filter(Highlight == "Significant in<br>histological and<br>clinical response")%>% 
       mutate(Origin = gsub(pattern = "_.*", replacement = "", Marker), 
              Origin = str_trim(Origin), 
              Annotation = paste0(Origin, " ", str_trim(Glycan_Annotation)))
@@ -698,17 +407,32 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
   Double_sign_Plot <- ggplot(DF_Plot, aes(x = log10(OR), y = -log10(p.value))) +
     # geom_point(data = legend_df, aes(x = log10(OR), y = -log10(p.value), size = 0)) +
     geom_point(data = DF_Plot, aes(color = Highlight, alpha = Significance), size = 2, show.legend = TRUE) +
-    geom_text_repel(data = Label_df, 
-                    # aes(label = Label), 
-                    aes(label = Label_df$Annotation), 
-                    color = "black", 
-                    size = 4, 
-                    force = 2,
-                    box.padding = 0.3, 
-                    point.padding = 0.1, 
-                    segment.color = NA, 
-                    max.overlaps = Inf, 
-                    min.segment.length = 0) +
+    # geom_text_repel(data = Label_df,
+    #                 # aes(label = Label),
+    #                 aes(label = Label_df$Annotation),
+    #                 color = "black",
+    #                 size = 4,
+    #                 force = 2,
+    #                 box.padding = 0.3,
+    #                 point.padding = 0.1,
+    #                 segment.color = NA,
+    #                 max.overlaps = Inf,
+    #                 min.segment.length = 0) +
+      geom_label_repel(data = Label_df,
+                   aes(label = Annotation),
+                   fill = "white",
+                   alpha = 1, 
+                   size = 5,
+                   color = "black",
+                   label.size = 0.3,
+                   label.r = unit(0.15, "lines"),
+                   label.padding = unit(0.3, "lines"),
+                   box.padding = 0.45,
+                   point.padding = 0.2,
+                   max.overlaps = Inf,
+                   show.legend = FALSE
+                   # segment.color = NA
+                   ) + 
     scale_colour_manual(values = lgnd_cols, 
                         limits = names(lgnd_cols),
                         drop = FALSE) +
@@ -719,20 +443,20 @@ plot_GLM_results_final <- function(Dataframe_GLM, Method, Double_Sign_Markers) {
                        breaks = seq(-10, 10, by = 5),
                        expand = expansion(mult = c(0.05, 0.05))) +
     facet_wrap(~ Outcome, ncol = 2, scales = "free_x") +
-    labs(title = paste0("Comparisons using ", Current_Title, " values"), 
+    labs(title = paste0("Associations between glycan markers and clinical/histological responses: ", Current_Title), 
          x = "Odds Ratio (Log<sub>10</sub>)", 
          y = "P value (-Log<sub>10</sub>)") + 
     geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  
     geom_vline(xintercept = 0, linetype = "dashed", color = "black") +  
     theme_minimal(base_size = 14) +
-    theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 14),
+    theme(plot.title = element_markdown(hjust = 0, face = "bold", size = 16),
           # legend.title = element_markdown(face = "bold"), 
           legend.title = element_blank(), 
-          legend.text = element_markdown(face = "bold", padding = unit(1, "lines")), 
+          legend.text = element_markdown(face = "bold", padding = unit(1, "lines"), size = 12), 
           # legend.key.spacing = unit(1.5, "lines"), 
           axis.title.x = element_markdown(face = "bold"), 
           axis.title.y = element_markdown(face = "bold"), 
-          strip.text.x.top = element_markdown(size = 11, hjust = 0.5, vjust = 0.5, face  = "bold"),
+          strip.text.x.top = element_markdown(size = 12, hjust = 0.5, vjust = 0.5, face  = "bold"),
           plot.caption.position = "plot", 
           plot.caption = element_markdown(hjust = 0.9, vjust = 1),
           panel.grid.major = element_line(color = "grey90"),
@@ -759,27 +483,35 @@ Double_T0 <- plot_GLM_results_final(Reg_Results_Firth_stats, "T0", Double_Sign_M
 Yeet <- wrap_plots(Double_T0, Double_M12, Double_delta, 
            ncol = 1, 
            guides = "collect") +
-  plot_annotation(tag_levels = "A", 
-                  title = "Firth penalised logistic regression 
-                  <br>Comparison between marker values and clinical/histological outcomes",
-                  theme = theme(plot.title = element_text(face = "bold", size = 23),
-                                plot.title.position = "plot", 
-                                plot.title.hjust = 0.5,       
-                                plot.tag = element_text(face = "bold", 
-                                                        colour = "black", 
-                                                        size = 30))) +
+  plot_annotation(tag_levels = "A"
+                  # ,
+  #                 title = "Firth penalised logistic regression 
+  #                 <br>Comparison between marker values and clinical/histological outcomes",
+  #                 theme = theme(plot.title = element_text(face = "bold", size = 23),
+  #                               plot.title.position = "plot", 
+  #                               plot.title.hjust = 0.5,       
+  #                               plot.tag = element_text(face = "bold", 
+  #                                                       colour = "black", 
+  #                                                       size = 30))
+  ) +
   plot_layout(axis_titles = "collect") &
   theme(plot.title = element_markdown(face = "bold"), 
         legend.position = "right",
-        legend.title = element_text(face = "bold"),
-        legend.key.width = unit(2, "lines"),
-        legend.key.height = unit(4, "lines"),    
-        legend.spacing.y = unit(0.5, "lines"))
+        legend.margin = margin(0, 0, 0, 0),
+        legend.title = element_blank(),
+        legend.key.width = unit(0.7, "lines"),
+        legend.key.height = unit(0.8, "lines"),    
+        # legend.spacing.y = unit(0.1, "lines"), 
+        legend.text = element_markdown(size = 13), 
+        plot.margin = margin(5, 6, 5, 5))
 
 Yeet <- Yeet & theme(plot.tag = element_text(color = "black", face = "bold", size = 30))
 
-ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta_Glycans_A4.jpeg",
-       plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
+# ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_5_GLMs/Firth_BM12Delta_Glycans_A4.jpeg",
+#        plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 300, scale = 2, device = "jpeg")
+
+ggsave(filename = "~/SLE/Glycans/Plots_2/Final_Figures/Figure_5.jpeg",
+       plot = Yeet, width  = 210, height = 297, units = "mm", dpi = 600, scale = 1.5, device = "jpeg")
 
 ```
 

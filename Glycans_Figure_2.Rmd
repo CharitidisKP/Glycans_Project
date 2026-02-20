@@ -83,7 +83,7 @@ Main_plot <- ggplot(Correlation_Results_Clean, aes(x = Comparator, y = Marker, f
                                               title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
   facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y", 
              labeller = labeller(Origin = function(x) 
-               ifelse(x == "Serum", "Serum<br>Proteome", x))) +
+               ifelse(x == "Serum", "Serum<br>N-glycome", x))) +
   # geom_text(aes(label = round(Correlation, 2)), size = 3) +
   geom_text(aes(label = Significance, vjust = 0, hjust = 0.5, fontface = "bold", size = 4.5)) +
   scale_y_discrete(labels = function(x) gsub("^[^_]*_", "", x), expand = c(0,0)) +
@@ -178,7 +178,7 @@ Main_plot <- ggplot(DF, aes(x = Comparator, y = RowKey, fill = Correlation)) +
                                               title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
   facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y", 
              labeller = labeller(Origin = function(x) 
-               ifelse(x == "Serum", "Serum<br>proteome", x))) +
+               ifelse(x == "Serum", "Serum<br>N-glycome", x))) +
   # geom_text(aes(label = round(Correlation, 2)), size = 3) +
   geom_text(aes(label = Significance), vjust = 0.8, hjust = 0.5, fontface = "bold", size = 7) +
   ## For some god forsaken reason they are aligned properly on the y axis with ##
@@ -190,17 +190,19 @@ Main_plot <- ggplot(DF, aes(x = Comparator, y = RowKey, fill = Correlation)) +
     x <- gsub("Extra Renal", "Extra<br>Renal", x)
     x <- gsub("Renal Impairment", "Renal<br>Impairment", x)
     x }, expand = c(0,0)) +
-  labs(title = "Heatmap of marker correlations compared to clicinal indices", x = NULL, y = NULL
+  labs(title = "Correlations between glycan markers and clinical features", x = NULL, y = NULL
        # caption = paste0("Correlation coefficient used: <b>Spearman</b> 
        # <br>P value: <b>Not adjusted</b>")
        ) +
   theme_minimal(base_size = 12, base_family = "sans") +
   theme(strip.placement = "outside",
-        strip.text.y.right = element_markdown(size = 11, angle = 0, hjust = 0, vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+        strip.text.y.right = element_markdown(size = 12, angle = 0, hjust = 0, 
+                                              vjust = 0.5, face  = "bold", margin = margin(l = 10)),
         axis.text.x = element_markdown(angle = 0, hjust = 0.5, size = 11,
                                        # face = "bold", 
                                        colour = "black"), 
-        axis.text.y = element_text(size = 11, face = "bold", colour = "black"),
+        strip.text.x.top = element_markdown(size = 12), 
+        axis.text.y = element_text(size = 12, face = "bold", colour = "black"),
         panel.grid  = element_blank(), 
         panel.spacing = unit(1, "lines"), 
         plot.caption.position = "plot", 
@@ -228,8 +230,10 @@ Main_plot <- ggplot(DF, aes(x = Comparator, y = RowKey, fill = Correlation)) +
 # ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_2_Correlations_Total/Correlations_significant_Glycans_A4.jpeg",
 #        plot = Main_plot, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
 
-```
+ggsave(filename = "~/SLE/Glycans/Plots_2/Final_Figures/Figure_2.jpeg",
+       plot = Main_plot, width = 210, height = 297, units = "mm", scale = 2, dpi = 600)
 
+```
 
 ```{r Correlation plots by Origin but combine them}
 
@@ -260,7 +264,7 @@ Sub_Correlation_plots_2 <- function(orig) {
   Cor_df_current <- Correlation_Results_Clean_Sign %>% 
     filter(Origin == orig)
 
-  Current_Title <- if (orig == "Serum") {"Serum proteome"} 
+  Current_Title <- if (orig == "Serum") {"Serum N-glycome"} 
   else { orig }
   
   n_markers <- Cor_df_current %>% 

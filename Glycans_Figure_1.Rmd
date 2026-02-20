@@ -6,6 +6,7 @@ library(ggtext)
 library(ggplot2)
 library(ggrepel)
 library(writexl)
+library(readxl)
 
 Pallete <- c("coral1", "deeppink3", "midnightblue", "cyan3", "mediumspringgreen", "yellow3")
 
@@ -19,7 +20,6 @@ Glycan_Annotations <- read_xlsx("~/SLE/Glycans/Output_Data/Gl_annotations.xlsx")
 
 ```
 
-
 ```{r Prep for the volcanos}
 
 FCR_Values_clean <- FCR_Values %>% 
@@ -29,7 +29,7 @@ FCR_Values_clean <- FCR_Values %>%
          Significance = if_else(p.value < 0.05, "Significant", "Not Significant"), 
          Significance_FDR = if_else(FDR < 0.05, "Significant", "Not Significant"), 
          Marker = str_remove(Marker, "^[^_]+_"), 
-         Origin = recode(Origin, Serum = "Serum<br>proteome", .default = Origin)) 
+         Origin = recode(Origin, Serum = "Serum<br>N-glycome", .default = Origin)) 
 
 Top_Glycans_nadj <- FCR_Values_clean %>%
   arrange(p.value) %>% 
@@ -48,7 +48,7 @@ Glycan_Annotations_2 <- Glycan_Annotations %>%
                                       collapse = " / "),
             .groups = "drop") %>%
   rename(Marker = Marker_base) %>% 
-  mutate(Origin = recode(Origin, Serum = "Serum<br>proteome", .default = Origin))
+  mutate(Origin = recode(Origin, Serum = "Serum<br>N-glycome", .default = Origin))
 
 Sign_Glycans_FDR_total <- FCR_Values_clean %>% 
   inner_join(Glycan_Annotations_2, by = c("Origin", "Marker")) %>% 
@@ -119,7 +119,7 @@ Volcano_FDR <- ggplot(FCR_Values_clean, aes(x = log2FC, y = FDR_log10)) +
   scale_y_continuous(limits = c(min(y_breaks_FDR), max(y_breaks_FDR)), 
                      breaks = y_breaks_FDR, 
                      expand = c(0, 0)) +  
-    labs(title = "Glycan expression change over a 12 month period", 
+    labs(title = "Glycan marker expression change over a 12 month period", 
          x = "Fold Change (log<sub>2</sub>FC)", 
          y = "P value (-log<sub>10</sub>)", 
          caption = paste0("<b>P value:</b> FDR adjusted
@@ -138,20 +138,32 @@ Volcano_FDR <- ggplot(FCR_Values_clean, aes(x = log2FC, y = FDR_log10)) +
           plot.caption.position = "plot", 
           plot.caption = element_markdown(hjust = 0.9, vjust = 1),
           panel.grid.major = element_line(color = "grey90"),
+          # panel.grid.major = element_blank(),
           panel.grid.minor = element_blank()) +
-  geom_text_repel(data = Sign_Glycans_FDR_total, aes(label = Glycan_Annotation), 
-                  size = 3, 
-                  force = 2,
-                  box.padding = 0.3, 
-                  point.padding = 0.1, 
-                  segment.color = NA, 
-                  max.overlaps = Inf, 
-                  min.segment.length = 0)
+  # geom_text_repel(data = Sign_Glycans_FDR_total, aes(label = Glycan_Annotation, fill = "white"),
+  #                 size = 3,
+  #                 force = 2,
+  #                 box.padding = 0.3,
+  #                 point.padding = 0.1,
+  #                 segment.color = NA,
+  #                 max.overlaps = Inf,
+  #                 min.segment.length = 0)
+  geom_label_repel(data = Sign_Glycans_FDR_total,
+                   aes(label = Glycan_Annotation),
+                   fill = "white",
+                   size = 3, 
+                   color = "black",
+                   label.size = 0.3,
+                   label.r = unit(0.15, "lines"),
+                   label.padding = unit(0.15, "lines"),
+                   box.padding = 0.3,
+                   point.padding = 0.1,
+                   max.overlaps = Inf,
+                   show.legend = FALSE
+                   # segment.color = NA
+                   )
 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_nadj.jpeg"),
-#        plot = Volcano_nadj, width = 10, height = 8, dpi = 300, device = "jpeg")
-# 
-# ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Figure_1_Volcano/Volcano_FDR_all_glycans_new_annot.jpeg"),
-#        plot = Volcano_FDR, scale = 2, width = 10, height = 8, dpi = 300, device = "jpeg")
+ggsave(filename = paste0("~/SLE/Glycans/Plots_2/Final_Figures/Figure_1_BG.jpeg"),
+       plot = Volcano_FDR, scale = 1, width = 10, height = 8, dpi = 600, device = "jpeg")
 
 ```

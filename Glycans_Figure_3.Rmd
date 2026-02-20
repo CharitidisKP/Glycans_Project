@@ -96,7 +96,7 @@ NIH_mapping <- c(Cellular_crescents = "Cellular/Fibrocellular_crescents",
                  Cellular_proliferation = "Endocapillary_hypercellularity",
                  Fibrinoid_necrosis_karyorrhexis = "Fibrinoid_necrosis",
                  Hyaline_thrombi_wire_loops = "Hyaline_deposits",
-                 Leukocyte_infiltration = "Neutrophiles/Karyorrhexis",
+                 Leukocyte_infiltration = "Neutrophiles/<br>Karyorrhexis",
                  Mononuclear_cell_infiltration = "Interstitial_inflammation")
 
 NIH_Corr_Res_Sign_only_Clean <- NIH_Corr_Res_Sign_only %>% 
@@ -106,7 +106,8 @@ NIH_Corr_Res_Sign_only_Clean <- NIH_Corr_Res_Sign_only %>%
          Origin = sub("_.*$", "", Marker), 
          Comparison = factor(Comparison, levels = c("Baseline vs Baseline", "Month 12 vs Month 12", "Baseline vs Month 12"))) %>% 
   rename(Correlation = "estimate") %>% 
-  inner_join(AI_CI_data_clean %>% select(Result, Category), by = c("Result"), relationship = "many-to-many") %>% 
+  inner_join(AI_CI_data_clean %>% 
+               distinct(Result, Category), by = c("Result"), relationship = "many-to-many") %>% 
   group_by(Marker) %>% 
   mutate(Origin = sub("_.*$", "", Marker), 
          Marker = sub("^[^_]*_", "", Marker), 
@@ -115,7 +116,8 @@ NIH_Corr_Res_Sign_only_Clean <- NIH_Corr_Res_Sign_only %>%
          Result = gsub("_", " ", Result), 
          # Result = sub("/", "/<br>", Result),
          Category = factor(Category, levels = c("NIH_AI", "NIH_CI")),
-         Category = gsub("_", " ", Category)) 
+         Category = gsub("_", " ", Category)) %>% 
+  ungroup()
 
 # write_csv(NIH_Corr_Res_Sign_only, file = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Glycan_NIH_Correlations.csv")
 
@@ -238,35 +240,40 @@ Main_plot_current_combined <- ggplot(DF, aes(x = Result, y = RowKey, fill = Corr
                          midpoint = 0, breaks = seq(-1, 1, by = 0.5), 
                          guide = guide_colorbar(order = 1, title.position = "top", title.hjust = 0, 
                                                 title = "Spearman<br>Correlation", title.theme = element_markdown(face = "bold"))) +
-    facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y") +
-    scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) str_wrap(x, width = 6)) +
-    # scale_y_discrete(expand = c(0, 0)) +
+    facet_grid(Origin ~ Comparison, scales = "free_y", space = "free_y", 
+               labeller = labeller(Origin = function(x) 
+                 ifelse(x == "Serum", "Serum<br>N-glycome", x))) +
+    scale_x_discrete(expand = c(0, 0), drop = TRUE, labels = function(x) gsub("<br>", "\n", x, fixed = TRUE)) +
     scale_y_discrete(labels = lab_map, drop = TRUE, expand = c(0,0)) +
     geom_text(aes(label = Significance), vjust = 0.7, hjust = 0.5, fontface = "bold", size = 7) +
-  ## Again, vjust is behaving wierd. Mosat likely due to scale = 2 ##
-    labs(title = paste0("Heatmap of marker - clinical/histopathological feature correlations"), x = NULL, y = NULL, 
-         caption = paste0("Only markers with significant Wilcoxon test results are shown")) +
+  ## Again, vjust is behaving wierd. Most likely due to scale = 2 ##
+    labs(title = paste0("Correlations between glycan markers and clinical/histopathological features"), 
+         x = NULL, y = NULL) +
     theme_minimal(base_size = 12, base_family = "sans") +
     theme(strip.placement = "outside",
-          strip.text.y.right = element_markdown(size = 11, angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
-          strip.text.x.top = element_text(size = 11, angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
+          strip.text.y.right = element_markdown(size = 12, angle = 0, hjust = 0, 
+                                                vjust = 0.5, face  = "bold", margin = margin(l = 10)),
+          strip.text.x.top = element_markdown(size = 11, angle = 0, hjust = 0.5, vjust = 0.5, face  = "bold"),
           axis.text.x = element_markdown(size = 11, angle = 60, hjust = 1, vjust = 1,
                                          # face = "bold", 
                                          colour = "black"), 
-          axis.text.y = element_text(size = 11, face = "bold", colour = "black"),
+          axis.text.y = element_markdown(size = 11, face = "bold", colour = "black"),
           panel.grid  = element_blank(), 
           panel.spacing = unit(1, "lines"),
           # aspect.ratio = n_markers/n_comp * 0.3,
-          plot.caption.position = "plot", 
+          # plot.caption.position = "plot", 
           plot.caption = element_markdown(hjust = 0.9, vjust = 1, lineheight = 1.3),
           plot.title = element_markdown(face = "bold", lineheight = 1.2))
 
 # ggsave(filename = "~/SLE/Glycans/Plots_2/Figure_3_Correlations_NIH/Correlations_NIH_Combined_Glycans_A4.jpeg",
 #        plot = Main_plot_current_combined, width = 210, height = 297, units = "mm", scale = 2, dpi = 300)
 
+ggsave(filename = "~/SLE/Glycans/Plots_2/Final_Figures/Figure_3.jpeg",
+       plot = Main_plot_current_combined, width = 210, height = 297, units = "mm", scale = 2, dpi = 600)
+
 ## Save the excels ##
-# write_xlsx(x = NIH_Corr_Res_Sign_only_Clean_2,
-#            path = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Figure_3_Glycan_NIH_Correlations.xlsx")
+write_xlsx(x = DF,
+           path = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Figure_3_Glycan_NIH_Correlations.xlsx")
 
 # NIH_Corr_Res_Sign_only_Clean_2 %>%
 #   filter(Comparison == "Baseline vs Baseline") %>%
@@ -282,5 +289,10 @@ Main_plot_current_combined <- ggplot(DF, aes(x = Result, y = RowKey, fill = Corr
 #   filter(Comparison == "Baseline vs Month 12") %>%
 #   write_xlsx(x = .,
 #              path = "~/SLE/Glycans/Output_Data/Figure_3_NIH_cors/Figure_3_Glycan_NIH_Correlations_BvsM12.xlsx")
+```
+
+```{r}
+
+#  caption = paste0("Only markers with significant Wilcoxon test results are shown")
 ```
 
